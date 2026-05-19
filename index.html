@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Builder - Mi Agencia</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Librerías para procesar archivos -->
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.2/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1>📧 Email Builder</h1>
+                <span class="badge">Mi Agencia</span>
+            </div>
+            <div class="header-right">
+                <button id="force-reload-data" class="header-btn danger">🔄 Forzar recarga</button>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <!-- Sidebar: Bloques disponibles -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>📦 Desarrollos</h2>
+                    <button id="reload-data" class="icon-btn" title="Recargar">
+                        🔄
+                    </button>
+                </div>
+                
+                <!-- Search -->
+                <div class="search-box">
+                    <input type="text" id="search-developments" placeholder="🔍 Buscar desarrollos..." class="search-input">
+                </div>
+
+                <!-- Import section -->
+                <div class="import-section">
+                    <input type="file" id="file-input" accept=".pdf,.pptx,.docx" style="display: none;">
+                    <button id="import-file-btn" class="import-btn">
+                        📁 Importar desde archivo
+                    </button>
+                    <div id="import-preview" class="import-preview" style="display: none;">
+                        <div class="preview-header">
+                            <h4>📋 Vista previa</h4>
+                            <button id="close-preview" class="close-preview">✕</button>
+                        </div>
+                        <div id="preview-content"></div>
+                        <button id="confirm-import" class="confirm-import-btn">
+                            ✅ Confirmar importación
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de desarrollos -->
+                <div class="developments-container">
+                    <div id="blocks-list" class="blocks-list">
+                        <div class="loading-spinner">Cargando desarrollos...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Lienzo principal -->
+            <main class="canvas">
+                <div class="canvas-header">
+                    <h2>📝 Armado de Email</h2>
+                    <div class="canvas-actions">
+                        <button id="clear-blocks" class="clear-btn" title="Limpiar todo">
+                            🗑️ Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="email-preview">
+                    <div class="email-header">
+                        <h1>Kudos Commerce</h1>
+                        <p>Especialistas en comercio unificado · Más de 17 años dedicados al Digital Commerce</p>
+                    </div>
+
+                    <div id="email-blocks" class="email-blocks drop-zone">
+                        <div class="empty-state">
+                            <span class="empty-icon">📌</span>
+                            <p>Arrastra desarrollos aquí</p>
+                            <small>o haz clic en "+ Agregar" en cada desarrollo</small>
+                        </div>
+                    </div>
+
+                    <div class="email-footer">
+                        <p>© 2025 Mi Agencia - Todos los derechos reservados</p>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="export-html" class="btn btn-primary">📄 Exportar HTML</button>
+                    <button id="copy-html" class="btn btn-secondary">📋 Copiar HTML</button>
+                    <button id="export-csv" class="btn btn-success">📊 Exportar CSV</button>
+                </div>
+            </main>
+
+            <!-- Panel derecho: Clientes -->
+            <aside class="right-sidebar">
+                <div class="sidebar-header">
+                    <h2>👥 Clientes</h2>
+                    <button id="reload-clients" class="icon-btn" title="Recargar">
+                        🔄
+                    </button>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" id="search-clients" placeholder="🔍 Buscar clientes..." class="search-input">
+                </div>
+
+                <div class="clients-container">
+                    <div id="clients-list" class="clients-list">
+                        <div class="loading-spinner">Cargando clientes...</div>
+                    </div>
+                </div>
+
+                <div class="clients-footer">
+                    <div class="selection-info" id="selection-info">
+                        0 clientes seleccionados
+                    </div>
+                    <button id="send-emails" class="send-btn">
+                        📧 Enviar correos
+                    </button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
