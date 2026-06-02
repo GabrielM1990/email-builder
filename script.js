@@ -166,11 +166,22 @@ function getRecentActivity(limit) {
     var sends = getSends();
     sends.forEach(function(send) {
         send.recipients.forEach(function(r) {
-            if (r.status !== 'sent') {
+            // Si hay eventos detallados, usar esos
+            if (r.events && r.events.length > 0) {
+                r.events.forEach(function(evt) {
+                    activities.push({
+                        type: evt.type === 'click' ? 'click' : evt.type === 'open' ? 'open' : evt.type === 'bounced' ? 'bounce' : 'send',
+                        clientName: r.nombre, clientEmail: r.email, subject: send.subject,
+                        date: evt.timestamp || r.lastEvent || send.date, sendId: send.id,
+                        blockName: evt.blockName || ''
+                    });
+                });
+            } else if (r.status !== 'sent') {
                 activities.push({
                     type: r.status === 'clicked' ? 'click' : r.status === 'opened' ? 'open' : r.status === 'bounced' ? 'bounce' : 'send',
                     clientName: r.nombre, clientEmail: r.email, subject: send.subject,
-                    date: r.lastEvent || send.date, sendId: send.id
+                    date: r.lastEvent || send.date, sendId: send.id,
+                    blockName: ''
                 });
             }
         });
@@ -734,7 +745,7 @@ async function sendEmails() {
         var client = selectedClients[i];
         var recipient = recipients[i];
         var blocksHTML = blocks.map(function(block) {
-            var trackableLink = APPS_SCRIPT_URL + '?action=click&sendId=' + sendId + '&trkId=' + recipient.trackingId + '&url=' + encodeURIComponent(block.link || '#');
+            var trackableLink = APPS_SCRIPT_URL + '?action=click&sendId=' + sendId + '&trkId=' + recipient.trackingId + '&url=' + encodeURIComponent(block.link || '#') + '&block=' + encodeURIComponent(block.nombre);
             return '<div style="border:1px solid #e0e0e0;border-radius:8px;padding:15px;margin-bottom:15px;font-family:Arial,sans-serif;"><h3 style="color:#1a73e8;margin-top:0;margin-bottom:10px;">' + escapeHtml(block.nombre) + '</h3><p style="margin:0 0 10px 0;line-height:1.5;">' + escapeHtml(block.descripcion || block.resumen || '') + '</p><a href="' + trackableLink + '" style="color:#1a73e8;text-decoration:none;">Ver desarrollo</a></div>';
         }).join('');
         var trackingPixel = '<img src="' + APPS_SCRIPT_URL + '?action=open&sendId=' + sendId + '&trkId=' + recipient.trackingId + '" width="1" height="1" style="display:none;" />';
@@ -1042,7 +1053,8 @@ function showClientProfile(clientEmail) {
                 blocks: send.blocks || [],
                 status: recipient.status, openCount: recipient.openCount || 0,
                 clickCount: recipient.clickCount || 0, lastEvent: recipient.lastEvent,
-                trackingId: recipient.trackingId
+                trackingId: recipient.trackingId,
+                events: recipient.events || []
             });
         }
     });
@@ -1097,18 +1109,26 @@ function showClientProfile(clientEmail) {
     } else {
         html += '<div class="cp-timeline">';
 
-        // Recopilar todos los eventos para la timeline
+        // Recopilar eventos detallados para la timeline
         var events = [];
         clientSends.forEach(function(cs) {
-            events.push({ type: 'sent', date: cs.date, subject: cs.subject, sendId: cs.sendId, details: cs });
-            if (cs.openCount > 0) {
-                events.push({ type: 'opened', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, details: cs, count: cs.openCount });
-            }
-            if (cs.clickCount > 0) {
-                events.push({ type: 'clicked', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, details: cs, count: cs.clickCount });
-            }
+            events.push({ type: 'sent', date: cs.date, subject: cs.subject, sendId: cs.sendId, blockName: '' });
             if (cs.status === 'bounced') {
-                events.push({ type: 'bounced', date: cs.date, subject: cs.subject, sendId: cs.sendId, details: cs });
+                events.push({ type: 'bounced', date: cs.date, subject: cs.subject, sendId: cs.sendId, blockName: '' });
+            }
+            // Si hay eventos detallados con blockName, usar esos
+            if (cs.events && cs.events.length > 0) {
+                cs.events.forEach(function(evt) {
+                    events.push({ type: evt.type, date: evt.timestamp, subject: cs.subject, sendId: cs.sendId, blockName: evt.blockName || '', url: evt.url || '' });
+                });
+            } else {
+                // Fallback: usar contadores si no hay eventos detallados
+                if (cs.openCount > 0) {
+                    events.push({ type: 'open', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, blockName: '', count: cs.openCount });
+                }
+                if (cs.clickCount > 0) {
+                    events.push({ type: 'click', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, blockName: '', count: cs.clickCount });
+                }
             }
         });
 
@@ -1119,10 +1139,13 @@ function showClientProfile(clientEmail) {
             var icon, color, text;
             if (evt.type === 'sent') {
                 icon = 'fa-paper-plane'; color = '#1a73e8'; text = 'Email enviado';
-            } else if (evt.type === 'opened') {
-                icon = 'fa-eye'; color = '#34a853'; text = 'Email abierto' + (evt.count > 1 ? ' (' + evt.count + ' veces)' : '');
-            } else if (evt.type === 'clicked') {
-                icon = 'fa-mouse-pointer'; color = '#f9ab00'; text = 'Link clickeado' + (evt.count > 1 ? ' (' + evt.count + ' veces)' : '');
+            } else if (evt.type === 'open' || evt.type === 'opened') {
+                icon = 'fa-eye'; color = '#34a853'; text = 'Email abierto';
+                if (evt.count > 1) text += ' (' + evt.count + ' veces)';
+            } else if (evt.type === 'click' || evt.type === 'clicked') {
+                icon = 'fa-mouse-pointer'; color = '#f9ab00';
+                text = 'Link clickeado';
+                if (evt.blockName) text = 'Clicke\u00f3 "' + evt.blockName + '"';
             } else if (evt.type === 'bounced') {
                 icon = 'fa-exclamation-triangle'; color = '#dc3545'; text = 'Email rebotado';
             }
@@ -1258,9 +1281,13 @@ function renderAnalytics() {
             activities.forEach(function(act) {
                 var iconClass = act.type === 'click' ? 'click' : act.type === 'open' ? 'open' : act.type === 'bounce' ? 'bounce' : 'send';
                 var iconFA = act.type === 'click' ? 'fa-mouse-pointer' : act.type === 'open' ? 'fa-eye' : act.type === 'bounce' ? 'fa-exclamation-circle' : 'fa-paper-plane';
-                var actionText = act.type === 'click' ? 'hizo click en' : act.type === 'open' ? 'abrio' : act.type === 'bounce' ? 'reboto' : 'recibio';
+                var actionText = act.type === 'click' ? 'hizo click' : act.type === 'open' ? 'abrio' : act.type === 'bounce' ? 'reboto' : 'recibio';
+                var detail = '';
+                if (act.type === 'click' && act.blockName) {
+                    detail = ' en "' + escapeHtml(act.blockName) + '"';
+                }
                 var timeAgo = getTimeAgo(act.date);
-                html += '<div class="activity-item"><div class="activity-icon ' + iconClass + '"><i class="fas ' + iconFA + '"></i></div><div class="activity-text"><strong>' + escapeHtml(act.clientName) + '</strong> ' + actionText + ' "' + escapeHtml(act.subject) + '"</div><div class="activity-time">' + timeAgo + '</div></div>';
+                html += '<div class="activity-item"><div class="activity-icon ' + iconClass + '"><i class="fas ' + iconFA + '"></i></div><div class="activity-text"><strong>' + escapeHtml(act.clientName) + '</strong> ' + actionText + detail + ' "' + escapeHtml(act.subject) + '"</div><div class="activity-time">' + timeAgo + '</div></div>';
             });
             activityContainer.innerHTML = html;
         }

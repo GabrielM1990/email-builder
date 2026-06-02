@@ -271,6 +271,7 @@ function handleClickRedirect(e) {
   var sendId = e.parameter.sendId || '';
   var trkId = e.parameter.trkId || '';
   var url = e.parameter.url || '';
+  var blockName = e.parameter.block || '';
 
   if (sendId && trkId) {
     try {
@@ -278,7 +279,8 @@ function handleClickRedirect(e) {
         sendId: sendId,
         trackingId: trkId,
         timestamp: new Date().toISOString(),
-        url: url
+        url: url,
+        blockName: blockName
       });
     } catch(err) {
       console.log('Error logging click:', err);
@@ -312,8 +314,8 @@ function logTrackingEvent(type, data) {
   // Crear hoja si no existe
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_TRACKING);
-    sheet.appendRow(['timestamp', 'eventType', 'sendId', 'trackingId', 'url']);
-    var headerRange = sheet.getRange(1, 1, 1, 5);
+    sheet.appendRow(['timestamp', 'eventType', 'sendId', 'trackingId', 'url', 'blockName']);
+    var headerRange = sheet.getRange(1, 1, 1, 6);
     headerRange.setFontWeight('bold').setBackground('#764ba2').setFontColor('#ffffff');
   }
 
@@ -322,7 +324,8 @@ function logTrackingEvent(type, data) {
     type,
     data.sendId || '',
     data.trackingId || '',
-    data.url || ''
+    data.url || '',
+    data.blockName || ''
   ]);
 
   // Actualizar contadores en hoja Envios
@@ -422,6 +425,42 @@ function getSendsData(e, callback) {
     });
   }
 
+  // Agregar eventos de tracking con blockName a cada recipient
+  var trackingSheet = ss.getSheetByName(SHEET_TRACKING);
+  if (trackingSheet) {
+    var trackingData = trackingSheet.getDataRange().getValues();
+    if (trackingData.length > 1) {
+      var tHeaders = trackingData[0];
+      var tColEventType = tHeaders.indexOf('eventType');
+      var tColTrackingId = tHeaders.indexOf('trackingId');
+      var tColBlockName = tHeaders.indexOf('blockName');
+      var tColTimestamp = tHeaders.indexOf('timestamp');
+      var tColUrl = tHeaders.indexOf('url');
+
+      for (var t = 1; t < trackingData.length; t++) {
+        var tEventType = trackingData[t][tColEventType];
+        var tTrackingId = trackingData[t][tColTrackingId];
+        var tBlockName = tColBlockName !== -1 ? trackingData[t][tColBlockName] : '';
+        var tTimestamp = trackingData[t][tColTimestamp];
+        var tUrl = tColUrl !== -1 ? trackingData[t][tColUrl] : '';
+
+        // Buscar el recipient correspondiente
+        for (var sKey in sends) {
+          var recipient = sends[sKey].recipients.find(function(r) { return r.trackingId === tTrackingId; });
+          if (recipient) {
+            if (!recipient.events) recipient.events = [];
+            recipient.events.push({
+              type: tEventType,
+              timestamp: tTimestamp,
+              blockName: tBlockName,
+              url: tUrl
+            });
+          }
+        }
+      }
+    }
+  }
+
   var sendsArray = Object.values(sends);
   // Ordenar por fecha descendente
   sendsArray.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
@@ -449,7 +488,8 @@ function getTrackingData(e, callback) {
       eventType: data[i][1],
       sendId: data[i][2],
       trackingId: data[i][3],
-      url: data[i][4]
+      url: data[i][4],
+      blockName: data[i][5] || ''
     });
   }
 
