@@ -45,6 +45,42 @@ function addSend(sendData) {
     return sendData;
 }
 
+// Cargar envios desde Google Sheets (fuente de verdad)
+async function fetchSendsFromSheet() {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getSends&t=' + Date.now();
+        var response = await fetch(url);
+        if (response.ok) {
+            var data = await response.json();
+            if (data.success && data.sends) {
+                saveSends(data.sends);
+                return data.sends;
+            }
+        }
+    } catch (e) {
+        console.log('Error cargando envios desde Sheet:', e);
+    }
+    return getSends();
+}
+
+// Cargar tracking desde Google Sheets (usa getSendsData que tiene contadores actualizados)
+async function fetchTrackingFromSheet() {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getSends&t=' + Date.now();
+        var response = await fetch(url);
+        if (response.ok) {
+            var data = await response.json();
+            if (data.success && data.sends) {
+                saveSends(data.sends);
+                return data.sends;
+            }
+        }
+    } catch (e) {
+        console.log('Error cargando tracking desde Sheet:', e);
+    }
+    return getSends();
+}
+
 function getClientHistory(clientEmail) {
     var sends = getSends();
     var history = [];
@@ -647,25 +683,27 @@ async function sendEmails() {
 
     var sendId = generateSendId();
     var sendDate = new Date().toISOString();
+    var subject = 'Nuevos desarrollos para tu tienda VTEX | Kudos Commerce';
+    var blocksData = blocks.map(function(b) { return { nombre: b.nombre, resumen: b.resumen, link: b.link }; });
+    var recipients = selectedClients.map(function(client) {
+        return { trackingId: generateTrackingId(), email: client.email, nombre: client.nombre, empresa: client.empresa, status: 'sent', openCount: 0, clickCount: 0, lastEvent: sendDate };
+    });
+
     var sendData = {
-        id: sendId, date: sendDate,
-        subject: 'Nuevos desarrollos para tu tienda VTEX | Kudos Commerce',
-        blocks: blocks.map(function(b) { return { nombre: b.nombre, resumen: b.resumen, link: b.link }; }),
-        totalRecipients: selectedClients.length,
-        recipients: selectedClients.map(function(client) {
-            return { trackingId: generateTrackingId(), email: client.email, nombre: client.nombre, empresa: client.empresa, status: 'sent', openCount: 0, clickCount: 0, lastEvent: sendDate };
-        })
+        id: sendId, date: sendDate, subject: subject,
+        blocks: blocksData, totalRecipients: selectedClients.length, recipients: recipients
     };
 
     var sendButton = document.getElementById('send-emails');
     var originalHTML = sendButton.innerHTML;
     sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
     sendButton.disabled = true;
-    var successCount = 0, errorCount = 0;
 
+    // Preparar recipients con su HTML individual para el Apps Script
+    var recipientsWithHTML = [];
     for (var i = 0; i < selectedClients.length; i++) {
         var client = selectedClients[i];
-        var recipient = sendData.recipients[i];
+        var recipient = recipients[i];
         var blocksHTML = blocks.map(function(block) {
             var trackableLink = APPS_SCRIPT_URL + '?action=click&sendId=' + sendId + '&trkId=' + recipient.trackingId + '&url=' + encodeURIComponent(block.link || '#');
             return '<div style="border:1px solid #e0e0e0;border-radius:8px;padding:15px;margin-bottom:15px;font-family:Arial,sans-serif;"><h3 style="color:#1a73e8;margin-top:0;margin-bottom:10px;">' + escapeHtml(block.nombre) + '</h3><p style="margin:0 0 10px 0;line-height:1.5;">' + escapeHtml(block.descripcion || block.resumen || '') + '</p><a href="' + trackableLink + '" style="color:#1a73e8;text-decoration:none;">Ver desarrollo</a></div>';
@@ -673,16 +711,39 @@ async function sendEmails() {
         var trackingPixel = '<img src="' + APPS_SCRIPT_URL + '?action=open&sendId=' + sendId + '&trkId=' + recipient.trackingId + '" width="1" height="1" style="display:none;" />';
         var emailTemplate = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px 20px;text-align:center;border-radius:12px 12px 0 0;"><h1 style="margin:0;">Kudos Commerce</h1><p style="margin:10px 0 0;">Especialistas en comercio unificado</p></div><div style="padding:20px;border:1px solid #e0e0e0;border-top:none;background:white;"><h2 style="color:#2c3e50;margin-top:0;">Nuevos desarrollos disponibles</h2><div style="margin-top:20px;">' + blocksHTML + '</div><div style="margin-top:30px;padding-top:20px;border-top:1px solid #e0e0e0;font-size:12px;color:#666;text-align:center;"><p>2026 Kudos Commerce - Todos los derechos reservados</p></div></div>' + trackingPixel + '</body></html>';
 
-        try {
-            await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: client.email, subject: 'Nuevos desarrollos para ' + client.empresa + ' | Kudos Commerce', htmlContent: emailTemplate, clientName: client.nombre, sendId: sendId, trackingId: recipient.trackingId })
-            });
-            successCount++; recipient.status = 'sent';
-        } catch (error) { errorCount++; recipient.status = 'bounced'; }
-        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (i + 1) + '/' + selectedClients.length + '...';
-        if (i < selectedClients.length - 1) await new Promise(function(resolve) { setTimeout(resolve, 2000); });
+        recipientsWithHTML.push({
+            trackingId: recipient.trackingId,
+            email: client.email,
+            nombre: client.nombre,
+            empresa: client.empresa,
+            htmlContent: emailTemplate
+        });
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando ' + (i + 1) + '/' + selectedClients.length + '...';
     }
 
+    // Enviar todo al Apps Script: envía emails + guarda en Sheets
+    var successCount = 0, errorCount = 0;
+    try {
+        await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'sendEmail',
+                sendId: sendId,
+                sendDate: sendDate,
+                subject: subject,
+                blocks: blocksData,
+                recipients: recipientsWithHTML
+            })
+        });
+        successCount = selectedClients.length;
+    } catch (error) {
+        errorCount = selectedClients.length;
+        recipients.forEach(function(r) { r.status = 'bounced'; });
+    }
+
+    // Guardar localmente como cache
     addSend(sendData);
     sendButton.innerHTML = originalHTML;
     sendButton.disabled = false;
@@ -935,18 +996,18 @@ function renderAnalytics() {
 // POLLING DE TRACKING
 // ============================================
 async function pollTrackingEvents() {
-    var sends = getSends();
-    var hasChanges = false;
-    sends.forEach(function(send) {
-        send.recipients.forEach(function(r) {
-            if (r.status === 'sent') {
-                if (Math.random() < 0.15) { r.status = 'opened'; r.openCount = (r.openCount || 0) + 1; r.lastEvent = new Date().toISOString(); hasChanges = true; }
-            } else if (r.status === 'opened') {
-                if (Math.random() < 0.08) { r.status = 'clicked'; r.clickCount = (r.clickCount || 0) + 1; r.lastEvent = new Date().toISOString(); hasChanges = true; }
-            }
-        });
-    });
-    if (hasChanges) { saveSends(sends); renderHistory(); renderAnalytics(); }
+    // Consultar datos reales desde Google Sheets
+    var updatedSends = await fetchTrackingFromSheet();
+    if (updatedSends && updatedSends.length > 0) {
+        var localSends = getSends();
+        // Comparar si hay cambios
+        var hasChanges = JSON.stringify(localSends) !== JSON.stringify(updatedSends);
+        if (hasChanges) {
+            saveSends(updatedSends);
+            renderHistory();
+            renderAnalytics();
+        }
+    }
 }
 
 // ============================================
@@ -1002,6 +1063,8 @@ async function init() {
     var closePreviewBtn = document.getElementById('close-preview');
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', function() { document.getElementById('import-preview').style.display = 'none'; });
 
+    // Cargar envios desde Google Sheets (fuente de verdad)
+    await fetchSendsFromSheet();
     renderHistory();
     renderAnalytics();
     setInterval(function() { pollTrackingEvents(); }, POLL_INTERVAL);
