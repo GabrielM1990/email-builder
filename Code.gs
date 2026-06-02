@@ -45,9 +45,23 @@ function doPost(e) {
   }
 }
 
+// Helper para responder con JSONP o JSON segun si hay callback
+function jsonResponse(data, callback) {
+  var json = JSON.stringify(data);
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doGet(e) {
   try {
     var action = e.parameter.action || '';
+    var callback = e.parameter.callback || '';
 
     switch (action) {
       case 'open':
@@ -55,18 +69,14 @@ function doGet(e) {
       case 'click':
         return handleClickRedirect(e);
       case 'getSends':
-        return getSendsData(e);
+        return getSendsData(e, callback);
       case 'getTracking':
-        return getTrackingData(e);
+        return getTrackingData(e, callback);
       default:
-        return ContentService
-          .createTextOutput(JSON.stringify({ success: true, message: 'Kudos Mail CRM API' }))
-          .setMimeType(ContentService.MimeType.JSON);
+        return jsonResponse({ success: true, message: 'Kudos Mail CRM API' }, callback);
     }
   } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ success: false, error: error.toString() }, e.parameter.callback || '');
   }
 }
 
@@ -234,17 +244,24 @@ function handleTrackingPixel(e) {
   var trkId = e.parameter.trkId || '';
 
   if (sendId && trkId) {
-    logTrackingEvent('open', {
-      sendId: sendId,
-      trackingId: trkId,
-      timestamp: new Date().toISOString()
-    });
+    try {
+      logTrackingEvent('open', {
+        sendId: sendId,
+        trackingId: trkId,
+        timestamp: new Date().toISOString()
+      });
+    } catch(err) {
+      console.log('Error logging open:', err);
+    }
   }
 
-  // Retornar pixel transparente 1x1
-  return ContentService
-    .createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT);
+  // Devolver respuesta minima tipo imagen
+  // Los proxies de email (Gmail, Outlook) hacen la petición GET al servidor
+  // Lo importante es que la petición LLEGA y se registra el evento en la hoja
+  // No necesitamos devolver una imagen real, solo una respuesta HTTP 200
+  var output = ContentService.createTextOutput('');
+  output.setMimeType(ContentService.MimeType.TEXT);
+  return output;
 }
 
 // ============================================
@@ -256,18 +273,27 @@ function handleClickRedirect(e) {
   var url = e.parameter.url || '';
 
   if (sendId && trkId) {
-    logTrackingEvent('click', {
-      sendId: sendId,
-      trackingId: trkId,
-      timestamp: new Date().toISOString(),
-      url: url
-    });
+    try {
+      logTrackingEvent('click', {
+        sendId: sendId,
+        trackingId: trkId,
+        timestamp: new Date().toISOString(),
+        url: url
+      });
+    } catch(err) {
+      console.log('Error logging click:', err);
+    }
   }
 
-  // Redirigir a la URL original
+  // Redirigir a la URL original con meta refresh + JS
   if (url) {
     return HtmlService.createHtmlOutput(
-      '<script>window.location.href="' + url + '";</script>'
+      '<!DOCTYPE html><html><head>' +
+      '<meta http-equiv="refresh" content="0;url=' + url + '">' +
+      '</head><body>' +
+      '<p>Redirigiendo...</p>' +
+      '<script>window.location.href="' + url + '";</script>' +
+      '</body></html>'
     );
   }
 
@@ -345,13 +371,11 @@ function updateSendTracking(trackingId, eventType) {
 // ============================================
 // OBTENER DATOS DE ENVIOS (GET)
 // ============================================
-function getSendsData(e) {
+function getSendsData(e, callback) {
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_ENVIOS);
   if (!sheet) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: true, sends: [] }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ success: true, sends: [] }, callback);
   }
 
   var data = sheet.getDataRange().getValues();
@@ -402,21 +426,17 @@ function getSendsData(e) {
   // Ordenar por fecha descendente
   sendsArray.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ success: true, sends: sendsArray }))
-    .setMimeType(ContentService.MimeType.JSON);
+  return jsonResponse({ success: true, sends: sendsArray }, callback);
 }
 
 // ============================================
 // OBTENER DATOS DE TRACKING (GET)
 // ============================================
-function getTrackingData(e) {
+function getTrackingData(e, callback) {
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_TRACKING);
   if (!sheet) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: true, events: [] }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ success: true, events: [] }, callback);
   }
 
   var data = sheet.getDataRange().getValues();
@@ -433,9 +453,7 @@ function getTrackingData(e) {
     });
   }
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ success: true, events: events }))
-    .setMimeType(ContentService.MimeType.JSON);
+  return jsonResponse({ success: true, events: events }, callback);
 }
 
 // ============================================
@@ -451,4 +469,67 @@ function testSend() {
     htmlBody: '<h1>Hola</h1><p>Esto es una prueba del CRM</p>',
     name: 'Kudos Commerce'
   });
+}
+
+// ============================================
+// DIAGNOSTICO Y SETUP
+// ============================================
+
+// Verificar que el spreadsheet es accesible
+function testConnection() {
+  try {
+    var ss = getSpreadsheet();
+    var name = ss.getName();
+    var sheets = ss.getSheets().map(function(s) { return s.getName(); });
+    return 'OK - Spreadsheet: ' + name + ' | Hojas: ' + sheets.join(', ');
+  } catch (e) {
+    return 'ERROR - ' + e.toString();
+  }
+}
+
+// Crear hojas de Envios y Tracking si no existen
+function setupSheets() {
+  var ss = getSpreadsheet();
+  
+  // Crear hoja Envios
+  var enviosSheet = ss.getSheetByName(SHEET_ENVIOS);
+  if (!enviosSheet) {
+    enviosSheet = ss.insertSheet(SHEET_ENVIOS);
+    enviosSheet.appendRow([
+      'sendId', 'sendDate', 'subject', 'trackingId',
+      'email', 'nombre', 'empresa', 'status',
+      'openCount', 'clickCount', 'lastEvent', 'blocks'
+    ]);
+    var headerRange = enviosSheet.getRange(1, 1, 1, 12);
+    headerRange.setFontWeight('bold').setBackground('#667eea').setFontColor('#ffffff');
+  }
+  
+  // Crear hoja Tracking
+  var trackingSheet = ss.getSheetByName(SHEET_TRACKING);
+  if (!trackingSheet) {
+    trackingSheet = ss.insertSheet(SHEET_TRACKING);
+    trackingSheet.appendRow(['timestamp', 'eventType', 'sendId', 'trackingId', 'url']);
+    var headerRange2 = trackingSheet.getRange(1, 1, 1, 5);
+    headerRange2.setFontWeight('bold').setBackground('#764ba2').setFontColor('#ffffff');
+  }
+  
+  return 'Hojas creadas: ' + SHEET_ENVIOS + ', ' + SHEET_TRACKING;
+}
+
+// Verificar datos de envios
+function checkSendsData() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_ENVIOS);
+  if (!sheet) return 'Hoja Envios no existe. Ejecuta setupSheets() primero.';
+  var lastRow = sheet.getLastRow();
+  return 'Hoja Envios: ' + (lastRow - 1) + ' registros';
+}
+
+// Verificar datos de tracking
+function checkTrackingData() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_TRACKING);
+  if (!sheet) return 'Hoja Tracking no existe. Ejecuta setupSheets() primero.';
+  var lastRow = sheet.getLastRow();
+  return 'Hoja Tracking: ' + (lastRow - 1) + ' eventos';
 }

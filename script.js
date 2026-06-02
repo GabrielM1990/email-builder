@@ -45,17 +45,51 @@ function addSend(sendData) {
     return sendData;
 }
 
-// Cargar envios desde Google Sheets (fuente de verdad)
+// Cargar envios desde Google Sheets usando JSONP (evita problemas de CORS)
+function fetchFromSheet(action) {
+    return new Promise(function(resolve) {
+        var callbackName = 'kudosCallback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        var url = APPS_SCRIPT_URL + '?action=' + action + '&callback=' + callbackName + '&t=' + Date.now();
+        
+        window[callbackName] = function(data) {
+            delete window[callbackName];
+            if (document.getElementById(callbackName)) {
+                document.getElementById(callbackName).remove();
+            }
+            resolve(data);
+        };
+        
+        var script = document.createElement('script');
+        script.id = callbackName;
+        script.src = url;
+        script.onerror = function() {
+            delete window[callbackName];
+            if (document.getElementById(callbackName)) {
+                document.getElementById(callbackName).remove();
+            }
+            resolve(null);
+        };
+        document.head.appendChild(script);
+        
+        // Timeout de 10 segundos
+        setTimeout(function() {
+            if (window[callbackName]) {
+                delete window[callbackName];
+                if (document.getElementById(callbackName)) {
+                    document.getElementById(callbackName).remove();
+                }
+                resolve(null);
+            }
+        }, 10000);
+    });
+}
+
 async function fetchSendsFromSheet() {
     try {
-        var url = APPS_SCRIPT_URL + '?action=getSends&t=' + Date.now();
-        var response = await fetch(url);
-        if (response.ok) {
-            var data = await response.json();
-            if (data.success && data.sends) {
-                saveSends(data.sends);
-                return data.sends;
-            }
+        var data = await fetchFromSheet('getSends');
+        if (data && data.success && data.sends) {
+            saveSends(data.sends);
+            return data.sends;
         }
     } catch (e) {
         console.log('Error cargando envios desde Sheet:', e);
@@ -66,14 +100,9 @@ async function fetchSendsFromSheet() {
 // Cargar tracking desde Google Sheets (usa getSendsData que tiene contadores actualizados)
 async function fetchTrackingFromSheet() {
     try {
-        var url = APPS_SCRIPT_URL + '?action=getSends&t=' + Date.now();
-        var response = await fetch(url);
-        if (response.ok) {
-            var data = await response.json();
-            if (data.success && data.sends) {
-                saveSends(data.sends);
-                return data.sends;
-            }
+        var data = await fetchFromSheet('getSends');
+        if (data && data.success && data.sends) {
+            return data.sends;
         }
     } catch (e) {
         console.log('Error cargando tracking desde Sheet:', e);
@@ -997,16 +1026,41 @@ function renderAnalytics() {
 // ============================================
 async function pollTrackingEvents() {
     // Consultar datos reales desde Google Sheets
-    var updatedSends = await fetchTrackingFromSheet();
-    if (updatedSends && updatedSends.length > 0) {
-        var localSends = getSends();
-        // Comparar si hay cambios
-        var hasChanges = JSON.stringify(localSends) !== JSON.stringify(updatedSends);
-        if (hasChanges) {
-            saveSends(updatedSends);
-            renderHistory();
-            renderAnalytics();
+    try {
+        var updatedSends = await fetchTrackingFromSheet();
+        if (updatedSends && updatedSends.length > 0) {
+            var localSends = getSends();
+            // Comparar contadores de tracking (no todo el JSON que puede variar)
+            var hasChanges = false;
+            if (localSends.length !== updatedSends.length) {
+                hasChanges = true;
+            } else {
+                for (var i = 0; i < updatedSends.length; i++) {
+                    var local = localSends.find(function(s) { return s.id === updatedSends[i].id; });
+                    if (!local) { hasChanges = true; break; }
+                    if (local.recipients.length !== updatedSends[i].recipients.length) { hasChanges = true; break; }
+                    for (var j = 0; j < updatedSends[i].recipients.length; j++) {
+                        var lr = local.recipients.find(function(r) { return r.trackingId === updatedSends[i].recipients[j].trackingId; });
+                        if (!lr) { hasChanges = true; break; }
+                        if (lr.status !== updatedSends[i].recipients[j].status ||
+                            lr.openCount !== updatedSends[i].recipients[j].openCount ||
+                            lr.clickCount !== updatedSends[i].recipients[j].clickCount) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    if (hasChanges) break;
+                }
+            }
+            if (hasChanges) {
+                saveSends(updatedSends);
+                renderHistory();
+                renderAnalytics();
+                console.log('Tracking actualizado desde Sheets');
+            }
         }
+    } catch (e) {
+        console.log('Error en polling de tracking:', e);
     }
 }
 
@@ -1057,7 +1111,13 @@ async function init() {
     document.querySelectorAll('.modal-overlay').forEach(function(overlay) { overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.style.display = 'none'; }); });
 
     var refreshHistoryBtn = document.getElementById('refresh-history');
-    if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', function() { renderHistory(); showToast('Historial actualizado', 'info'); });
+    if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', async function() {
+        showToast('Sincronizando con Google Sheets...', 'info');
+        await fetchSendsFromSheet();
+        renderHistory();
+        renderAnalytics();
+        showToast('Historial sincronizado', 'success');
+    });
 
     // Close preview
     var closePreviewBtn = document.getElementById('close-preview');
