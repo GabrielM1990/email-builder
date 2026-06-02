@@ -868,11 +868,98 @@ function getTimeAgo(dateStr) {
 // ============================================
 // TABS
 // ============================================
-function switchTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName); });
-    document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.toggle('active', content.id === 'tab-' + tabName); });
-    if (tabName === 'history') renderHistory();
-    if (tabName === 'analytics') renderAnalytics();
+function switchTab(navName) {
+    // Actualizar nav items
+    document.querySelectorAll('.nav-item').forEach(function(btn) { btn.classList.toggle('active', btn.getAttribute('data-nav') === navName); });
+    // Actualizar views
+    document.querySelectorAll('.view-content').forEach(function(view) { view.classList.toggle('active', view.id === 'view-' + navName); });
+    // Renderizar contenido segun la vista
+    if (navName === 'history') renderHistory();
+    if (navName === 'analytics') renderAnalytics();
+    if (navName === 'clients') renderClientsPage();
+}
+
+// ============================================
+// CLIENTS PAGE - Vista de clientes
+// ============================================
+var clientPageSearchTerm = '';
+
+function renderClientsPage() {
+    var grid = document.getElementById('clients-page-grid');
+    if (!grid) return;
+    var sends = getSends();
+
+    // Calcular stats por cliente
+    var clientStats = {};
+    sends.forEach(function(send) {
+        send.recipients.forEach(function(r) {
+            if (!clientStats[r.email]) {
+                clientStats[r.email] = { nombre: r.nombre, email: r.email, empresa: r.empresa, sentCount: 0, openCount: 0, clickCount: 0, bounceCount: 0, lastEvent: null };
+            }
+            clientStats[r.email].sentCount++;
+            if (r.status === 'opened' || r.status === 'clicked') clientStats[r.email].openCount++;
+            if (r.status === 'clicked') clientStats[r.email].clickCount++;
+            if (r.status === 'bounced') clientStats[r.email].bounceCount++;
+            if (r.lastEvent) clientStats[r.email].lastEvent = r.lastEvent;
+        });
+    });
+
+    // Combinar con todos los clientes
+    var allClients = clients.map(function(c) {
+        var stats = clientStats[c.email] || { sentCount: 0, openCount: 0, clickCount: 0, bounceCount: 0, lastEvent: null };
+        var status = 'inactive';
+        if (stats.clickCount > 0) status = 'engaged';
+        else if (stats.openCount > 0) status = 'active';
+        else if (stats.sentCount > 0) status = 'cold';
+        return {
+            nombre: c.nombre, email: c.email, empresa: c.empresa,
+            initials: c.nombre.split(' ').map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase(),
+            sentCount: stats.sentCount, openCount: stats.openCount, clickCount: stats.clickCount, bounceCount: stats.bounceCount,
+            lastEvent: stats.lastEvent, status: status
+        };
+    });
+
+    // Filtrar por busqueda
+    if (clientPageSearchTerm) {
+        var term = clientPageSearchTerm.toLowerCase();
+        allClients = allClients.filter(function(c) {
+            return c.nombre.toLowerCase().indexOf(term) !== -1 || c.email.toLowerCase().indexOf(term) !== -1 || c.empresa.toLowerCase().indexOf(term) !== -1;
+        });
+    }
+
+    // Ordenar: mas activos primero
+    allClients.sort(function(a, b) {
+        var order = { engaged: 0, active: 1, cold: 2, inactive: 3 };
+        return (order[a.status] || 4) - (order[b.status] || 4);
+    });
+
+    if (allClients.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><i class="fas fa-users empty-icon"></i><p>No hay clientes</p><small>Carg&aacute; los clientes desde Google Sheets</small></div>';
+        return;
+    }
+
+    var html = '';
+    allClients.forEach(function(c) {
+        var statusText = c.status === 'engaged' ? 'Comprometido' : c.status === 'active' ? 'Activo' : c.status === 'cold' ? 'Sin abrir' : 'Sin actividad';
+        var statusIcon = c.status === 'engaged' ? 'fa-fire' : c.status === 'active' ? 'fa-check-circle' : c.status === 'cold' ? 'fa-clock' : 'fa-minus-circle';
+        html += '<div class="client-card" onclick="showClientProfile(\'' + c.email.replace(/'/g, "\\'") + '\')">';
+        html += '<div class="client-card-header">';
+        html += '<div class="client-card-avatar">' + c.initials + '</div>';
+        html += '<div class="client-card-info">';
+        html += '<div class="client-card-name">' + escapeHtml(c.nombre) + '</div>';
+        html += '<div class="client-card-company">' + escapeHtml(c.empresa) + '</div>';
+        html += '<div class="client-card-email">' + escapeHtml(c.email) + '</div>';
+        html += '</div>';
+        html += '<span class="client-card-status ' + c.status + '"><i class="fas ' + statusIcon + '"></i> ' + statusText + '</span>';
+        html += '</div>';
+        html += '<div class="client-card-stats">';
+        html += '<div class="client-card-stat"><div class="client-card-stat-value">' + c.sentCount + '</div><div class="client-card-stat-label">Enviados</div></div>';
+        html += '<div class="client-card-stat"><div class="client-card-stat-value">' + c.openCount + '</div><div class="client-card-stat-label">Abiertos</div></div>';
+        html += '<div class="client-card-stat"><div class="client-card-stat-value">' + c.clickCount + '</div><div class="client-card-stat-label">Clicks</div></div>';
+        html += '</div>';
+        html += '</div>';
+    });
+    grid.innerHTML = html;
 }
 
 // ============================================
@@ -1259,8 +1346,16 @@ async function init() {
     var searchClientInput = document.getElementById('search-clients');
     if (searchClientInput) searchClientInput.addEventListener('input', function(e) { clientSearchTerm = e.target.value; renderClientSelector(); });
 
-    // Tabs
-    document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.addEventListener('click', function() { switchTab(this.getAttribute('data-tab')); }); });
+    // Nav items
+    document.querySelectorAll('.nav-item').forEach(function(btn) { btn.addEventListener('click', function() { switchTab(this.getAttribute('data-nav')); }); });
+
+    // Clients page search
+    var searchClientsPage = document.getElementById('search-clients-page');
+    if (searchClientsPage) searchClientsPage.addEventListener('input', function(e) { clientPageSearchTerm = e.target.value; renderClientsPage(); });
+
+    // Reload clients page
+    var reloadClientsPageBtn = document.getElementById('reload-clients-page');
+    if (reloadClientsPageBtn) reloadClientsPageBtn.addEventListener('click', function() { loadClients(); renderClientsPage(); showToast('Clientes recargados', 'info'); });
 
     // Modal close
     var closeSendDetail = document.getElementById('close-send-detail');

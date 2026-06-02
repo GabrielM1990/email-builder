@@ -14,61 +14,175 @@ body {
 /* App Container */
 .app-container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100vh;
 }
 
-/* Header */
-.app-header {
+/* ============================================
+   NAV SIDEBAR - Menu lateral
+   ============================================ */
+.nav-sidebar {
+    width: 72px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    flex-shrink: 0;
+    z-index: 100;
+}
+
+.nav-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 32px;
+    gap: 6px;
+}
+
+.nav-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.nav-brand-text {
+    font-size: 9px;
+    color: rgba(255,255,255,0.6);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    width: 100%;
+    padding: 0 8px;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 4px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.2s;
+    font-size: 10px;
+    font-weight: 500;
+    width: 100%;
+}
+
+.nav-item i {
+    font-size: 18px;
+}
+
+.nav-item:hover {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.8);
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.nav-footer {
+    padding: 8px;
+}
+
+.nav-footer-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.5);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.nav-footer-btn:hover {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+}
+
+/* ============================================
+   MAIN WRAPPER - Contenido principal
+   ============================================ */
+.main-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f0f2f5;
+}
+
+/* View Content */
+.view-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.view-content.active {
+    display: flex;
+}
+
+.view-header {
     background: white;
-    padding: 12px 24px;
+    padding: 16px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    flex-shrink: 0;
 }
 
-.header-left {
+.view-header h2 {
+    font-size: 18px;
+    color: #2c3e50;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
-.header-left h1 {
-    font-size: 20px;
-    color: #1a73e8;
+.view-header h2 i {
+    color: #667eea;
 }
 
-.badge {
-    background: #e8f0fe;
-    color: #1a73e8;
-    padding: 4px 8px;
-    border-radius: 20px;
-    font-size: 12px;
+.view-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.header-btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
+.view-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
 }
 
-.header-btn.danger {
-    background: #dc3545;
-    color: white;
-}
-
-.header-btn.danger:hover {
-    background: #c82333;
-}
-
-/* Main Layout */
-.main-layout {
+/* ============================================
+   COMPOSER LAYOUT - 3 columnas
+   ============================================ */
+.composer-layout {
     display: flex;
     flex: 1;
     overflow: hidden;
@@ -76,35 +190,182 @@ body {
     background: #e0e0e0;
 }
 
-/* Sidebar izquierda */
-.sidebar {
-    width: 320px;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.right-sidebar {
+.composer-devs-panel,
+.composer-clients-panel {
     width: 280px;
     background: white;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
-.sidebar-header {
-    padding: 16px;
+.composer-preview-panel {
+    flex: 1;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.panel-header {
+    padding: 14px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
 }
 
-.sidebar-header h2 {
-    font-size: 16px;
+.panel-header h3 {
+    font-size: 14px;
     color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
+
+.panel-header h3 i {
+    color: #667eea;
+    font-size: 13px;
+}
+
+/* ============================================
+   CLIENTS PAGE - Vista de clientes
+   ============================================ */
+.clients-page-search {
+    margin-bottom: 20px;
+}
+
+.search-input-lg {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-input-lg:focus {
+    border-color: #667eea;
+}
+
+.clients-page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.client-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e8e8e8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.client-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+    transform: translateY(-2px);
+}
+
+.client-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.client-card-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.client-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.client-card-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c3e50;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.client-card-company {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.client-card-email {
+    font-size: 11px;
+    color: #bbb;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.client-card-stats {
+    display: flex;
+    gap: 8px;
+}
+
+.client-card-stat {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.client-card-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a73e8;
+}
+
+.client-card-stat-label {
+    font-size: 9px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.client-card-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.client-card-status.engaged { background: #e6f4ea; color: #137333; }
+.client-card-status.active { background: #e8f0fe; color: #1a73e8; }
+.client-card-status.cold { background: #fef7e0; color: #b06000; }
+.client-card-status.inactive { background: #f1f3f4; color: #5f6368; }
+
+/* Sidebar viejos - ahora usamos composer-devs-panel y composer-clients-panel */
 
 .icon-btn {
     background: none;
@@ -302,47 +563,32 @@ body {
     background: #1557b0;
 }
 
-/* Canvas */
-.canvas {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: #f5f5f5;
-    overflow: hidden;
-}
-
-.canvas-header {
-    padding: 16px;
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.canvas-header h2 {
-    font-size: 16px;
-    color: #2c3e50;
-}
-
-.clear-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.clear-btn:hover {
-    background: #c82333;
-}
+/* Canvas viejos - ahora usamos view-content y view-header */
 
 .email-preview {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+}
+
+/* Boton ghost */
+.btn-ghost {
+    background: transparent;
+    color: #6c757d;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-ghost:hover {
+    background: #f8f9fa;
+    color: #2c3e50;
+    border-color: #ccc;
 }
 
 .email-header {
@@ -605,60 +851,17 @@ body {
     border: 1px dashed #1a73e8;
 }
 
-/* ============================================
-   TABS DE NAVEGACION
-   ============================================ */
-.canvas-tabs {
-    display: flex;
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
-    padding: 0 16px;
-}
-
-.tab-btn {
-    padding: 12px 20px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    color: #6c757d;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.tab-btn:hover {
-    color: #1a73e8;
-    background: #f8f9fa;
-}
-
-.tab-btn.active {
-    color: #1a73e8;
-    border-bottom-color: #1a73e8;
-    font-weight: 600;
-}
-
-.tab-content {
-    display: none;
-    flex: 1;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.tab-content.active {
-    display: flex;
-}
+/* Tabs viejos - ahora usamos nav-sidebar y view-content */
 
 /* ============================================
    HISTORIAL DE ENVIOS
    ============================================ */
 .history-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
+    padding: 0;
+}
+
+.view-body .history-container {
+    overflow: visible;
 }
 
 .history-list {
@@ -748,9 +951,11 @@ body {
    ANALYTICS
    ============================================ */
 .analytics-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
+    padding: 0;
+}
+
+.view-body .analytics-container {
+    overflow: visible;
 }
 
 .kpi-grid {
