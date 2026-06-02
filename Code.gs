@@ -481,15 +481,22 @@ function getTrackingData(e, callback) {
   var data = sheet.getDataRange().getValues();
   var headers = data[0];
   var events = [];
+  
+  var colTimestamp = headers.indexOf('timestamp');
+  var colEventType = headers.indexOf('eventType');
+  var colSendId = headers.indexOf('sendId');
+  var colTrackingId = headers.indexOf('trackingId');
+  var colUrl = headers.indexOf('url');
+  var colBlockName = headers.indexOf('blockName');
 
   for (var i = 1; i < data.length; i++) {
     events.push({
-      timestamp: data[i][0],
-      eventType: data[i][1],
-      sendId: data[i][2],
-      trackingId: data[i][3],
-      url: data[i][4],
-      blockName: data[i][5] || ''
+      timestamp: colTimestamp !== -1 ? data[i][colTimestamp] : '',
+      eventType: colEventType !== -1 ? data[i][colEventType] : '',
+      sendId: colSendId !== -1 ? data[i][colSendId] : '',
+      trackingId: colTrackingId !== -1 ? data[i][colTrackingId] : '',
+      url: colUrl !== -1 ? data[i][colUrl] : '',
+      blockName: colBlockName !== -1 ? (data[i][colBlockName] || '') : ''
     });
   }
 
@@ -548,8 +555,8 @@ function setupSheets() {
   var trackingSheet = ss.getSheetByName(SHEET_TRACKING);
   if (!trackingSheet) {
     trackingSheet = ss.insertSheet(SHEET_TRACKING);
-    trackingSheet.appendRow(['timestamp', 'eventType', 'sendId', 'trackingId', 'url']);
-    var headerRange2 = trackingSheet.getRange(1, 1, 1, 5);
+    trackingSheet.appendRow(['timestamp', 'eventType', 'sendId', 'trackingId', 'url', 'blockName']);
+    var headerRange2 = trackingSheet.getRange(1, 1, 1, 6);
     headerRange2.setFontWeight('bold').setBackground('#764ba2').setFontColor('#ffffff');
   }
   
@@ -572,4 +579,28 @@ function checkTrackingData() {
   if (!sheet) return 'Hoja Tracking no existe. Ejecuta setupSheets() primero.';
   var lastRow = sheet.getLastRow();
   return 'Hoja Tracking: ' + (lastRow - 1) + ' eventos';
+}
+
+// Migrar hoja Tracking existente para agregar columna blockName
+function migrateTrackingSheet() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_TRACKING);
+  if (!sheet) return 'Hoja Tracking no existe';
+  
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  // Verificar si ya tiene la columna blockName
+  if (headers.indexOf('blockName') !== -1) {
+    return 'La hoja ya tiene la columna blockName. No necesita migracion.';
+  }
+  
+  // Agregar columna blockName al final
+  var lastCol = sheet.getLastColumn();
+  sheet.getRange(1, lastCol + 1).setValue('blockName');
+  
+  // Formatear header
+  var headerRange = sheet.getRange(1, 1, 1, lastCol + 1);
+  headerRange.setFontWeight('bold').setBackground('#764ba2').setFontColor('#ffffff');
+  
+  return 'Columna blockName agregada a la hoja Tracking. Total columnas: ' + (lastCol + 1);
 }
