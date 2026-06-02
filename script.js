@@ -944,27 +944,186 @@ function showClientProfile(clientEmail) {
     var title = document.getElementById('modal-client-title');
     var body = document.getElementById('modal-client-body');
     title.textContent = client.nombre;
-    var history = getClientHistory(clientEmail);
-    var totalSent = history.length;
-    var totalOpened = history.filter(function(h) { return h.status === 'opened' || h.status === 'clicked'; }).length;
-    var totalClicked = history.filter(function(h) { return h.status === 'clicked'; }).length;
+
+    var sends = getSends();
+    var clientSends = [];
+    sends.forEach(function(send) {
+        var recipient = send.recipients.find(function(r) { return r.email === clientEmail; });
+        if (recipient) {
+            clientSends.push({
+                sendId: send.id, subject: send.subject, date: send.date,
+                blocks: send.blocks || [],
+                status: recipient.status, openCount: recipient.openCount || 0,
+                clickCount: recipient.clickCount || 0, lastEvent: recipient.lastEvent,
+                trackingId: recipient.trackingId
+            });
+        }
+    });
+
+    var totalSent = clientSends.length;
+    var totalOpened = clientSends.filter(function(h) { return h.status === 'opened' || h.status === 'clicked'; }).length;
+    var totalClicked = clientSends.filter(function(h) { return h.status === 'clicked'; }).length;
+    var totalBounced = clientSends.filter(function(h) { return h.status === 'bounced'; }).length;
+    var totalOpenCount = clientSends.reduce(function(sum, h) { return sum + h.openCount; }, 0);
+    var totalClickCount = clientSends.reduce(function(sum, h) { return sum + h.clickCount; }, 0);
     var openRate = totalSent > 0 ? (totalOpened / totalSent * 100).toFixed(0) : 0;
+    var clickRate = totalSent > 0 ? (totalClicked / totalSent * 100).toFixed(0) : 0;
+    var lastActivity = clientSends.length > 0 ? clientSends[0].lastEvent || clientSends[0].date : null;
     var initials = client.nombre.split(' ').map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase();
-    var html = '<div class="client-profile-header"><div class="client-profile-avatar">' + initials + '</div><div class="client-profile-info"><h3>' + escapeHtml(client.nombre) + '</h3><p>' + escapeHtml(client.email) + ' | ' + escapeHtml(client.empresa) + '</p></div></div>';
-    html += '<div class="client-profile-stats"><div class="client-stat-card"><div class="stat-value">' + totalSent + '</div><div class="stat-label">Enviados</div></div><div class="client-stat-card"><div class="stat-value">' + totalOpened + '</div><div class="stat-label">Abiertos</div></div><div class="client-stat-card"><div class="stat-value">' + totalClicked + '</div><div class="stat-label">Clickeados</div></div><div class="client-stat-card"><div class="stat-value">' + openRate + '%</div><div class="stat-label">Tasa Apertura</div></div></div>';
-    html += '<div class="client-email-history"><h3>Historial de correos</h3>';
-    if (history.length === 0) { html += '<p style="color:#999;font-size:13px;">No hay correos enviados a este cliente</p>'; }
-    else {
-        history.forEach(function(h) {
-            var statusClass = h.status === 'sent' ? 'not-opened' : h.status;
-            var statusText = h.status === 'sent' ? 'Enviado' : h.status === 'opened' ? 'Abierto' : h.status === 'clicked' ? 'Clickeado' : h.status === 'bounced' ? 'Rebotado' : h.status;
-            var dateStr = new Date(h.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
-            html += '<div class="email-history-item"><div><span class="email-history-subject">' + escapeHtml(h.subject) + '</span><span class="email-history-date" style="margin-left:8px;">' + dateStr + '</span></div><span class="status-badge ' + statusClass + '">' + statusText + '</span></div>';
+
+    // Determinar estado del cliente
+    var clientStatus = 'inactive';
+    var clientStatusText = 'Sin actividad';
+    if (totalClicked > 0) { clientStatus = 'engaged'; clientStatusText = 'Muy comprometido'; }
+    else if (totalOpened > 0) { clientStatus = 'active'; clientStatusText = 'Activo'; }
+    else if (totalSent > 0) { clientStatus = 'cold'; clientStatusText = 'Sin abrir'; }
+
+    var html = '';
+
+    // Header del cliente
+    html += '<div class="cp-header">';
+    html += '<div class="cp-avatar">' + initials + '</div>';
+    html += '<div class="cp-info">';
+    html += '<h3>' + escapeHtml(client.nombre) + '</h3>';
+    html += '<p class="cp-email">' + escapeHtml(client.email) + '</p>';
+    html += '<p class="cp-company">' + escapeHtml(client.empresa) + '</p>';
+    html += '</div>';
+    html += '<span class="cp-status-badge cp-status-' + clientStatus + '">' + clientStatusText + '</span>';
+    html += '</div>';
+
+    // KPIs del cliente
+    html += '<div class="cp-kpis">';
+    html += '<div class="cp-kpi"><div class="cp-kpi-value">' + totalSent + '</div><div class="cp-kpi-label">Enviados</div></div>';
+    html += '<div class="cp-kpi"><div class="cp-kpi-value">' + totalOpened + '</div><div class="cp-kpi-label">Abiertos</div></div>';
+    html += '<div class="cp-kpi"><div class="cp-kpi-value">' + totalClicked + '</div><div class="cp-kpi-label">Clickeados</div></div>';
+    html += '<div class="cp-kpi"><div class="cp-kpi-value">' + totalBounced + '</div><div class="cp-kpi-label">Rebotados</div></div>';
+    html += '<div class="cp-kpi cp-kpi-highlight"><div class="cp-kpi-value">' + openRate + '%</div><div class="cp-kpi-label">Tasa Apertura</div></div>';
+    html += '<div class="cp-kpi cp-kpi-highlight"><div class="cp-kpi-value">' + clickRate + '%</div><div class="cp-kpi-label">Tasa Click</div></div>';
+    html += '</div>';
+
+    // Timeline de interacciones
+    html += '<div class="cp-section">';
+    html += '<h3 class="cp-section-title"><i class="fas fa-stream"></i> Timeline de Interacciones</h3>';
+
+    if (clientSends.length === 0) {
+        html += '<div class="cp-empty">No hay correos enviados a este cliente</div>';
+    } else {
+        html += '<div class="cp-timeline">';
+
+        // Recopilar todos los eventos para la timeline
+        var events = [];
+        clientSends.forEach(function(cs) {
+            events.push({ type: 'sent', date: cs.date, subject: cs.subject, sendId: cs.sendId, details: cs });
+            if (cs.openCount > 0) {
+                events.push({ type: 'opened', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, details: cs, count: cs.openCount });
+            }
+            if (cs.clickCount > 0) {
+                events.push({ type: 'clicked', date: cs.lastEvent, subject: cs.subject, sendId: cs.sendId, details: cs, count: cs.clickCount });
+            }
+            if (cs.status === 'bounced') {
+                events.push({ type: 'bounced', date: cs.date, subject: cs.subject, sendId: cs.sendId, details: cs });
+            }
+        });
+
+        // Ordenar por fecha descendente
+        events.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+
+        events.forEach(function(evt) {
+            var icon, color, text;
+            if (evt.type === 'sent') {
+                icon = 'fa-paper-plane'; color = '#1a73e8'; text = 'Email enviado';
+            } else if (evt.type === 'opened') {
+                icon = 'fa-eye'; color = '#34a853'; text = 'Email abierto' + (evt.count > 1 ? ' (' + evt.count + ' veces)' : '');
+            } else if (evt.type === 'clicked') {
+                icon = 'fa-mouse-pointer'; color = '#f9ab00'; text = 'Link clickeado' + (evt.count > 1 ? ' (' + evt.count + ' veces)' : '');
+            } else if (evt.type === 'bounced') {
+                icon = 'fa-exclamation-triangle'; color = '#dc3545'; text = 'Email rebotado';
+            }
+            var dateStr = new Date(evt.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            html += '<div class="cp-timeline-item">';
+            html += '<div class="cp-timeline-icon" style="background:' + color + '"><i class="fas ' + icon + '"></i></div>';
+            html += '<div class="cp-timeline-content">';
+            html += '<div class="cp-timeline-text">' + text + '</div>';
+            html += '<div class="cp-timeline-subject">' + escapeHtml(evt.subject) + '</div>';
+            html += '<div class="cp-timeline-date">' + dateStr + '</div>';
+            html += '</div>';
+            html += '</div>';
+        });
+
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // Historial de emails con detalle expandible
+    html += '<div class="cp-section">';
+    html += '<h3 class="cp-section-title"><i class="fas fa-envelope"></i> Emails Enviados (' + totalSent + ')</h3>';
+
+    if (clientSends.length === 0) {
+        html += '<div class="cp-empty">No hay correos enviados a este cliente</div>';
+    } else {
+        clientSends.forEach(function(cs, idx) {
+            var statusClass = cs.status === 'sent' ? 'not-opened' : cs.status;
+            var statusText = cs.status === 'sent' ? 'Enviado' : cs.status === 'opened' ? 'Abierto' : cs.status === 'clicked' ? 'Clickeado' : cs.status === 'bounced' ? 'Rebotado' : cs.status;
+            var dateStr = new Date(cs.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+            var lastEventStr = cs.lastEvent ? new Date(cs.lastEvent).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+
+            html += '<div class="cp-email-card" data-send-idx="' + idx + '">';
+            html += '<div class="cp-email-card-header" onclick="toggleEmailDetail(' + idx + ')">';
+            html += '<div class="cp-email-card-left">';
+            html += '<span class="status-badge ' + statusClass + '">' + statusText + '</span>';
+            html += '<span class="cp-email-subject">' + escapeHtml(cs.subject) + '</span>';
+            html += '</div>';
+            html += '<div class="cp-email-card-right">';
+            html += '<span class="cp-email-date">' + dateStr + '</span>';
+            html += '<i class="fas fa-chevron-down cp-email-chevron" id="chevron-' + idx + '"></i>';
+            html += '</div>';
+            html += '</div>';
+
+            // Detalle expandible
+            html += '<div class="cp-email-detail" id="email-detail-' + idx + '" style="display:none;">';
+            html += '<div class="cp-email-detail-grid">';
+            html += '<div class="cp-detail-item"><span class="cp-detail-label">Fecha de envio</span><span class="cp-detail-value">' + dateStr + '</span></div>';
+            html += '<div class="cp-detail-item"><span class="cp-detail-label">Ultima actividad</span><span class="cp-detail-value">' + lastEventStr + '</span></div>';
+            html += '<div class="cp-detail-item"><span class="cp-detail-label">Aperturas</span><span class="cp-detail-value">' + cs.openCount + '</span></div>';
+            html += '<div class="cp-detail-item"><span class="cp-detail-label">Clicks</span><span class="cp-detail-value">' + cs.clickCount + '</span></div>';
+            html += '</div>';
+
+            // Desarrollos incluidos en el email
+            if (cs.blocks && cs.blocks.length > 0) {
+                html += '<div class="cp-email-blocks">';
+                html += '<div class="cp-blocks-title">Desarrollos incluidos</div>';
+                cs.blocks.forEach(function(block) {
+                    html += '<div class="cp-block-item">';
+                    html += '<div class="cp-block-name"><i class="fas fa-cube"></i> ' + escapeHtml(block.nombre) + '</div>';
+                    if (block.resumen) html += '<div class="cp-block-resumen">' + escapeHtml(block.resumen) + '</div>';
+                    if (block.link) html += '<a href="' + escapeHtml(block.link) + '" target="_blank" class="cp-block-link"><i class="fas fa-external-link-alt"></i> Ver desarrollo</a>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>'; // cp-email-detail
+            html += '</div>'; // cp-email-card
         });
     }
     html += '</div>';
+
     body.innerHTML = html;
     modal.style.display = 'flex';
+}
+
+// Toggle detalle de email en perfil de cliente
+function toggleEmailDetail(idx) {
+    var detail = document.getElementById('email-detail-' + idx);
+    var chevron = document.getElementById('chevron-' + idx);
+    if (!detail) return;
+    if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+    } else {
+        detail.style.display = 'none';
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
 }
 
 // ============================================

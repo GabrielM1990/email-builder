@@ -963,6 +963,10 @@ body {
     max-width: 800px;
 }
 
+.modal-xlarge {
+    max-width: 950px;
+}
+
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
@@ -1108,91 +1112,343 @@ body {
 .status-badge.not-opened { background: #f0f0f0; color: #999; }
 
 /* Client Profile Modal */
-.client-profile-header {
+/* ============================================
+   CLIENT PROFILE - Panel Completo
+   ============================================ */
+
+/* Header del cliente */
+.cp-header {
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid #e0e0e0;
 }
 
-.client-profile-avatar {
-    width: 56px;
-    height: 56px;
+.cp-avatar {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 700;
+    flex-shrink: 0;
 }
 
-.client-profile-info h3 {
+.cp-info {
+    flex: 1;
+}
+
+.cp-info h3 {
     font-size: 18px;
     color: #2c3e50;
     margin: 0 0 4px 0;
 }
 
-.client-profile-info p {
+.cp-email {
     font-size: 13px;
+    color: #666;
+    margin: 0 0 2px 0;
+}
+
+.cp-company {
+    font-size: 12px;
     color: #999;
     margin: 0;
 }
 
-.client-profile-stats {
+/* Badge de estado del cliente */
+.cp-status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cp-status-engaged {
+    background: #e6f4ea;
+    color: #137333;
+}
+
+.cp-status-active {
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.cp-status-cold {
+    background: #fef7e0;
+    color: #b06000;
+}
+
+.cp-status-inactive {
+    background: #f1f3f4;
+    color: #5f6368;
+}
+
+/* KPIs del cliente */
+.cp-kpis {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
     margin-bottom: 24px;
 }
 
-.client-stat-card {
+.cp-kpi {
     background: #f8f9fa;
     border-radius: 10px;
-    padding: 14px;
+    padding: 12px;
     text-align: center;
 }
 
-.client-stat-card .stat-value {
-    font-size: 20px;
+.cp-kpi-highlight {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.cp-kpi-highlight .cp-kpi-value {
+    color: white;
+}
+
+.cp-kpi-highlight .cp-kpi-label {
+    color: rgba(255,255,255,0.8);
+}
+
+.cp-kpi-value {
+    font-size: 22px;
     font-weight: 700;
     color: #1a73e8;
 }
 
-.client-stat-card .stat-label {
-    font-size: 11px;
+.cp-kpi-label {
+    font-size: 10px;
     color: #6c757d;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Secciones del perfil */
+.cp-section {
+    margin-bottom: 24px;
+}
+
+.cp-section-title {
+    font-size: 14px;
+    color: #2c3e50;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cp-section-title i {
+    color: #667eea;
+}
+
+.cp-empty {
+    color: #999;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* Timeline de interacciones */
+.cp-timeline {
+    position: relative;
+    padding-left: 32px;
+}
+
+.cp-timeline::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e0e0e0;
+}
+
+.cp-timeline-item {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.cp-timeline-icon {
+    position: absolute;
+    left: -32px;
+    top: 2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    z-index: 1;
+}
+
+.cp-timeline-content {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+.cp-timeline-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.cp-timeline-subject {
+    font-size: 12px;
+    color: #666;
     margin-top: 2px;
 }
 
-.client-email-history h3 {
-    font-size: 15px;
-    color: #2c3e50;
-    margin-bottom: 12px;
+.cp-timeline-date {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
 }
 
-.email-history-item {
+/* Cards de emails enviados */
+.cp-email-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    border: 1px solid #e8e8e8;
+}
+
+.cp-email-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    margin-bottom: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
-.email-history-subject {
+.cp-email-card-header:hover {
+    background: #f0f1f3;
+}
+
+.cp-email-card-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cp-email-card-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cp-email-subject {
     font-size: 13px;
     font-weight: 500;
     color: #2c3e50;
 }
 
-.email-history-date {
+.cp-email-date {
     font-size: 11px;
     color: #999;
+}
+
+.cp-email-chevron {
+    font-size: 12px;
+    color: #999;
+    transition: transform 0.3s;
+}
+
+/* Detalle expandible del email */
+.cp-email-detail {
+    padding: 14px;
+    border-top: 1px solid #e8e8e8;
+    background: white;
+}
+
+.cp-email-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.cp-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cp-detail-label {
+    font-size: 10px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cp-detail-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+/* Bloques/desarrollos del email */
+.cp-email-blocks {
+    margin-top: 10px;
+}
+
+.cp-blocks-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cp-block-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.cp-block-name {
+    font-size: 13px;
+    color: #2c3e50;
+}
+
+.cp-block-name i {
+    color: #667eea;
+    margin-right: 6px;
+    font-size: 11px;
+}
+
+.cp-block-link {
+    font-size: 11px;
+    color: #1a73e8;
+    text-decoration: none;
+}
+
+.cp-block-link:hover {
+    text-decoration: underline;
 }
 
 /* ============================================
