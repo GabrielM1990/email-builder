@@ -119,7 +119,8 @@ function getClientHistory(clientEmail) {
             history.push({
                 sendId: send.id, subject: send.subject, date: send.date,
                 status: recipient.status, openCount: recipient.openCount || 0,
-                clickCount: recipient.clickCount || 0, lastEvent: recipient.lastEvent
+                clickCount: recipient.clickCount || 0, lastEvent: recipient.lastEvent,
+                events: recipient.events || []
             });
         }
     });
@@ -726,7 +727,7 @@ async function sendEmails() {
     var subject = 'Nuevos desarrollos para tu tienda VTEX | Kudos Commerce';
     var blocksData = blocks.map(function(b) { return { nombre: b.nombre, resumen: b.resumen, link: b.link }; });
     var recipients = selectedClients.map(function(client) {
-        return { trackingId: generateTrackingId(), email: client.email, nombre: client.nombre, empresa: client.empresa, status: 'sent', openCount: 0, clickCount: 0, lastEvent: sendDate };
+        return { trackingId: generateTrackingId(), email: client.email, nombre: client.nombre, empresa: client.empresa, status: 'sent', openCount: 0, clickCount: 0, lastEvent: sendDate, events: [] };
     });
 
     var sendData = {
@@ -1035,13 +1036,23 @@ function showSendDetail(sendId) {
 // ============================================
 // PERFIL DE CLIENTE (MODAL)
 // ============================================
-function showClientProfile(clientEmail) {
+async function showClientProfile(clientEmail) {
     var client = clients.find(function(c) { return c.email === clientEmail; });
     if (!client) return;
     var modal = document.getElementById('client-profile-modal');
     var title = document.getElementById('modal-client-title');
     var body = document.getElementById('modal-client-body');
     title.textContent = client.nombre;
+
+    // Forzar actualizacion de datos desde Sheet antes de mostrar
+    try {
+        var updatedSends = await fetchTrackingFromSheet();
+        if (updatedSends && updatedSends.length > 0) {
+            saveSends(updatedSends);
+        }
+    } catch(e) {
+        console.log('Error actualizando datos para perfil:', e);
+    }
 
     var sends = getSends();
     var clientSends = [];
@@ -1315,11 +1326,29 @@ async function pollTrackingEvents() {
                     for (var j = 0; j < updatedSends[i].recipients.length; j++) {
                         var lr = local.recipients.find(function(r) { return r.trackingId === updatedSends[i].recipients[j].trackingId; });
                         if (!lr) { hasChanges = true; break; }
-                        if (lr.status !== updatedSends[i].recipients[j].status ||
-                            lr.openCount !== updatedSends[i].recipients[j].openCount ||
-                            lr.clickCount !== updatedSends[i].recipients[j].clickCount) {
+                        var ur = updatedSends[i].recipients[j];
+                        if (lr.status !== ur.status ||
+                            lr.openCount !== ur.openCount ||
+                            lr.clickCount !== ur.clickCount) {
                             hasChanges = true;
                             break;
+                        }
+                        // Detectar cambios en events (blockName)
+                        var localEventsCount = (lr.events && lr.events.length) || 0;
+                        var updatedEventsCount = (ur.events && ur.events.length) || 0;
+                        if (localEventsCount !== updatedEventsCount) {
+                            hasChanges = true;
+                            break;
+                        }
+                        // Verificar si algun event tiene blockName que no teniamos
+                        if (ur.events && ur.events.length > 0) {
+                            for (var e = 0; e < ur.events.length; e++) {
+                                if (ur.events[e].blockName && (!lr.events || !lr.events[e] || lr.events[e].blockName !== ur.events[e].blockName)) {
+                                    hasChanges = true;
+                                    break;
+                                }
+                            }
+                            if (hasChanges) break;
                         }
                     }
                     if (hasChanges) break;
