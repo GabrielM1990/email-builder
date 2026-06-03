@@ -791,7 +791,7 @@ async function sendEmails() {
     sendButton.disabled = false;
     if (errorCount === 0) showToast('Se enviaron ' + successCount + ' correos correctamente', 'success');
     else showToast('Envio: ' + successCount + ' exitosos, ' + errorCount + ' fallidos', 'warning');
-    renderHistory(); renderAnalytics(); switchTab('history');
+    renderHistory(); renderAnalytics(); navigateTo('history');
 }
 
 async function reloadClients() {
@@ -879,9 +879,36 @@ function getTimeAgo(dateStr) {
 }
 
 // ============================================
-// TABS
+// ROUTER - Sistema de rutas con hash
 // ============================================
-function switchTab(navName) {
+var ROUTE_MAP = {
+    'composer': 'componer',
+    'history': 'enviados',
+    'analytics': 'analytics',
+    'clients': 'clientes'
+};
+
+var ROUTE_REVERSE = {
+    'componer': 'composer',
+    'enviados': 'history',
+    'analytics': 'analytics',
+    'clientes': 'clients'
+};
+
+function getRouteFromNav(navName) {
+    return ROUTE_MAP[navName] || navName;
+}
+
+function getNavFromRoute(route) {
+    return ROUTE_REVERSE[route] || route;
+}
+
+function navigateTo(navName) {
+    var route = getRouteFromNav(navName);
+    window.location.hash = '#/' + route;
+}
+
+function switchTab(navName, updateHash) {
     // Actualizar nav items
     document.querySelectorAll('.nav-item').forEach(function(btn) { btn.classList.toggle('active', btn.getAttribute('data-nav') === navName); });
     // Actualizar views
@@ -890,6 +917,20 @@ function switchTab(navName) {
     if (navName === 'history') renderHistory();
     if (navName === 'analytics') renderAnalytics();
     if (navName === 'clients') renderClientsPage();
+    // Actualizar hash si es necesario
+    if (updateHash !== false) {
+        var route = getRouteFromNav(navName);
+        if (window.location.hash !== '#/' + route) {
+            window.location.hash = '#/' + route;
+        }
+    }
+}
+
+function handleRouteChange() {
+    var hash = window.location.hash || '#/componer';
+    var route = hash.replace('#/', '');
+    var navName = getNavFromRoute(route);
+    switchTab(navName, false);
 }
 
 // ============================================
@@ -1419,7 +1460,7 @@ async function init() {
     if (searchClientInput) searchClientInput.addEventListener('input', function(e) { clientSearchTerm = e.target.value; renderClientSelector(); });
 
     // Nav items
-    document.querySelectorAll('.nav-item').forEach(function(btn) { btn.addEventListener('click', function() { switchTab(this.getAttribute('data-nav')); }); });
+    document.querySelectorAll('.nav-item').forEach(function(btn) { btn.addEventListener('click', function() { navigateTo(this.getAttribute('data-nav')); }); });
 
     // Clients page search
     var searchClientsPage = document.getElementById('search-clients-page');
@@ -1449,10 +1490,17 @@ async function init() {
     var closePreviewBtn = document.getElementById('close-preview');
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', function() { document.getElementById('import-preview').style.display = 'none'; });
 
+    // Escuchar cambios de ruta
+    window.addEventListener('hashchange', handleRouteChange);
+
     // Cargar envios desde Google Sheets (fuente de verdad)
     await fetchSendsFromSheet();
     renderHistory();
     renderAnalytics();
+
+    // Inicializar ruta segun la URL
+    handleRouteChange();
+
     setInterval(function() { pollTrackingEvents(); }, POLL_INTERVAL);
 
     console.log('Kudos Mail CRM inicializado');
