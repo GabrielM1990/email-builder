@@ -174,7 +174,8 @@ function getRecentActivity(limit) {
                         type: evt.type === 'click' ? 'click' : evt.type === 'open' ? 'open' : evt.type === 'bounced' ? 'bounce' : 'send',
                         clientName: r.nombre, clientEmail: r.email, subject: send.subject,
                         date: evt.timestamp || r.lastEvent || send.date, sendId: send.id,
-                        blockName: evt.blockName || ''
+                        blockName: evt.blockName || '',
+                        url: evt.url || ''
                     });
                 });
             } else if (r.status !== 'sent') {
@@ -1161,11 +1162,19 @@ async function showClientProfile(clientEmail) {
                 icon = 'fa-exclamation-triangle'; color = '#dc3545'; text = 'Email rebotado';
             }
             var dateStr = new Date(evt.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            // Para clicks, mostrar blockName/url como detalle; para otros eventos, el subject
+            var detailText = '';
+            if ((evt.type === 'click' || evt.type === 'clicked') && (evt.blockName || evt.url)) {
+                detailText = evt.blockName ? escapeHtml(evt.blockName) : '';
+                if (evt.url) detailText += (detailText ? ' - ' : '') + '<a href="' + escapeHtml(evt.url) + '" target="_blank" style="color:#1a73e8;text-decoration:none;font-size:12px;">Ver enlace</a>';
+            } else {
+                detailText = escapeHtml(evt.subject);
+            }
             html += '<div class="cp-timeline-item">';
             html += '<div class="cp-timeline-icon" style="background:' + color + '"><i class="fas ' + icon + '"></i></div>';
             html += '<div class="cp-timeline-content">';
             html += '<div class="cp-timeline-text">' + text + '</div>';
-            html += '<div class="cp-timeline-subject">' + escapeHtml(evt.subject) + '</div>';
+            html += '<div class="cp-timeline-subject">' + detailText + '</div>';
             html += '<div class="cp-timeline-date">' + dateStr + '</div>';
             html += '</div>';
             html += '</div>';
@@ -1294,11 +1303,18 @@ function renderAnalytics() {
                 var iconFA = act.type === 'click' ? 'fa-mouse-pointer' : act.type === 'open' ? 'fa-eye' : act.type === 'bounce' ? 'fa-exclamation-circle' : 'fa-paper-plane';
                 var actionText = act.type === 'click' ? 'hizo click' : act.type === 'open' ? 'abrio' : act.type === 'bounce' ? 'reboto' : 'recibio';
                 var detail = '';
-                if (act.type === 'click' && act.blockName) {
-                    detail = ' en "' + escapeHtml(act.blockName) + '"';
+                var subjectOrBlock = escapeHtml(act.subject);
+                if (act.type === 'click') {
+                    if (act.blockName) {
+                        detail = ' en "' + escapeHtml(act.blockName) + '"';
+                        subjectOrBlock = escapeHtml(act.blockName);
+                    }
+                    if (act.url) {
+                        subjectOrBlock += ' - <a href="' + escapeHtml(act.url) + '" target="_blank" style="color:#1a73e8;text-decoration:none;font-size:12px;">Ver enlace</a>';
+                    }
                 }
                 var timeAgo = getTimeAgo(act.date);
-                html += '<div class="activity-item"><div class="activity-icon ' + iconClass + '"><i class="fas ' + iconFA + '"></i></div><div class="activity-text"><strong>' + escapeHtml(act.clientName) + '</strong> ' + actionText + detail + ' "' + escapeHtml(act.subject) + '"</div><div class="activity-time">' + timeAgo + '</div></div>';
+                html += '<div class="activity-item"><div class="activity-icon ' + iconClass + '"><i class="fas ' + iconFA + '"></i></div><div class="activity-text"><strong>' + escapeHtml(act.clientName) + '</strong> ' + actionText + detail + ' "' + subjectOrBlock + '"</div><div class="activity-time">' + timeAgo + '</div></div>';
             });
             activityContainer.innerHTML = html;
         }
