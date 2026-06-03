@@ -42,7 +42,7 @@
         <!-- Contenido principal -->
         <div class="main-wrapper">
             <!-- VISTA: Componer Email -->
-            <div id="view-composer" class="view-content active">
+            <div id="view-composer" class="view-content">
                 <div class="view-header">
                     <h2><i class="fas fa-edit"></i> Componer Email</h2>
                     <div class="view-actions">
@@ -194,5 +194,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        // Ejecutar router inmediatamente para evitar parpadeo al recargar
+        if (typeof handleRouteChange === "function") handleRouteChange();
+    </script>
 </body>
 </html>
