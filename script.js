@@ -439,6 +439,8 @@ async function loadClients() {
 function renderSidebar() {
     var container = document.getElementById('blocks-list');
     container.innerHTML = '';
+    renderSeguimientoComposerSummary();
+
     var filtered = developments;
     if (devSearchTerm) {
         filtered = developments.filter(function(d) {
@@ -449,6 +451,19 @@ function renderSidebar() {
         container.innerHTML = '<div class="loading">No hay desarrollos que coincidan</div>';
         return;
     }
+
+    // Sort: non-implemented first when a client store is selected
+    var stores = getSelectedClientStores();
+    if (stores.length) {
+        filtered = filtered.slice().sort(function(a, b) {
+            var aImpl = stores.some(function(s) { return getDevStatusForStore(a, s) === 'Implementado'; });
+            var bImpl = stores.some(function(s) { return getDevStatusForStore(b, s) === 'Implementado'; });
+            if (aImpl && !bImpl) return 1;
+            if (!aImpl && bImpl) return -1;
+            return 0;
+        });
+    }
+
     filtered.forEach(function(dev) {
         var block = document.createElement('div');
         block.className = 'block-card';
@@ -589,6 +604,46 @@ function getDevStatusForStore(dev, store) {
     return '';
 }
 
+function renderSeguimientoComposerSummary() {
+    var container = document.querySelector('.composer-devs-panel .panel-header');
+    if (!container) return;
+    var existing = document.getElementById('seg-composer-summary');
+    if (existing) existing.remove();
+
+    var stores = getSelectedClientStores();
+    if (!stores.length) return;
+
+    var totals = {};
+    var statusColors = {
+        'Implementado': '#137333',
+        'En curso': '#1a73e8',
+        'Propuesto': '#b06000',
+        'Proponer': '#5f6368',
+        'No aplica': '#dc3545'
+    };
+    var countEnStore = {};
+
+    stores.forEach(function(store) {
+        if (!countEnStore[store]) countEnStore[store] = { total: 0, Implementado: 0 };
+        masterData.desarrollos.forEach(function(d) {
+            var st = d.estados[store] || '';
+            if (st) {
+                countEnStore[store].total++;
+                if (st === 'Implementado') countEnStore[store].Implementado++;
+            }
+        });
+    });
+
+    var html = '<div id="seg-composer-summary" class="seg-composer-summary">';
+    stores.forEach(function(store) {
+        var c = countEnStore[store] || { total: 0, Implementado: 0 };
+        var pct = c.total ? Math.round((c.Implementado / c.total) * 100) : 0;
+        html += '<div class="seg-composer-store-bar"><span class="seg-composer-store-name">' + escapeHtml(store) + '</span><span class="seg-composer-store-stat"><strong>' + c.Implementado + '</strong>/' + c.total + ' implementados</span><div class="seg-composer-bar"><div class="seg-composer-bar-fill" style="width:' + pct + '%;background:' + (pct >= 75 ? '#137333' : pct >= 50 ? '#b06000' : '#dc3545') + ';"></div></div></div>';
+    });
+    html += '</div>';
+    container.parentNode.insertBefore(document.createRange().createContextualFragment(html), container.nextSibling);
+}
+
 function getDevSeguimientoBadge(dev) {
     var stores = getSelectedClientStores();
     if (!stores.length) return '';
@@ -599,11 +654,39 @@ function getDevSeguimientoBadge(dev) {
     });
     if (!Object.keys(statuses).length) return '';
 
-    var isImplemented = Object.values(statuses).every(function(v) { return v === 'Implementado'; });
-    var badgeClass = isImplemented ? 'seg-dev-badge implemented' : 'seg-dev-badge';
-    var icon = isImplemented ? 'fa-check-circle' : 'fa-info-circle';
-    var label = Object.values(statuses).join(', ');
-    return '<span class="' + badgeClass + '" title="' + escapeHtml(label) + '"><i class="fas ' + icon + '"></i></span>';
+    var statusColors = {
+        'Implementado': { bg: '#e6f4ea', text: '#137333', icon: 'fa-check-circle' },
+        'En curso': { bg: '#e8f0fe', text: '#1a73e8', icon: 'fa-spinner' },
+        'Propuesto': { bg: '#fef7e0', text: '#b06000', icon: 'fa-clock' },
+        'Proponer': { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-lightbulb' },
+        'No aplica': { bg: '#fce8e6', text: '#dc3545', icon: 'fa-ban' }
+    };
+
+    var statusLabels = {
+        'Implementado': 'Implementado',
+        'En curso': 'En curso',
+        'Propuesto': 'Propuesto',
+        'Proponer': 'Proponer',
+        'No aplica': 'No aplica'
+    };
+
+    // Build combined display: if only one store, show short label; if multiple, show first status
+    var entries = Object.entries(statuses);
+    if (entries.length === 1) {
+        var st = entries[0][1];
+        var c = statusColors[st] || { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-minus' };
+        var label = statusLabels[st] || st;
+        return '<span class="seg-dev-badge" style="background:' + c.bg + ';color:' + c.text + ';" title="' + escapeHtml(st) + '"><i class="fas ' + c.icon + '"></i> ' + escapeHtml(label) + '</span>';
+    }
+
+    // Multiple stores: show summary
+    var allImplemented = entries.every(function(e) { return e[1] === 'Implementado'; });
+    if (allImplemented) {
+        return '<span class="seg-dev-badge" style="background:#e6f4ea;color:#137333;" title="Implementado en todas las tiendas"><i class="fas fa-check-circle"></i> Implementado</span>';
+    }
+    // Show mixed
+    var labels = entries.map(function(e) { var c = statusColors[e[1]] || {}; return (c.icon ? '<i class="fas ' + c.icon + '" style="font-size:9px;"></i>' : '') + ' ' + (statusLabels[e[1]] || e[1]); }).join(' | ');
+    return '<span class="seg-dev-badge" style="background:#f1f3f4;color:#5f6368;font-size:10px;" title="' + escapeHtml(entries.map(function(e) { return e[0] + ': ' + e[1]; }).join(', ')) + '">' + labels + '</span>';
 }
 
 // ============================================

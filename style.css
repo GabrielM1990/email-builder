@@ -2038,6 +2038,54 @@ body {
     color: #137333;
 }
 
+/* Composer Seguimiento summary bar */
+.seg-composer-summary {
+    padding: 10px 16px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.seg-composer-store-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.seg-composer-store-name {
+    font-weight: 600;
+    font-size: 12px;
+    color: #2c3e50;
+    min-width: 80px;
+}
+
+.seg-composer-store-stat {
+    font-size: 11px;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+.seg-composer-store-stat strong {
+    color: #137333;
+}
+
+.seg-composer-bar {
+    flex: 1;
+    min-width: 60px;
+    height: 5px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.seg-composer-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+}
+
 /* ============================================
    EMPTY STATE ICON
    ============================================ */
