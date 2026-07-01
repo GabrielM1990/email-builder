@@ -175,7 +175,45 @@ function doGet(e) {
 }
 
 function handleSendViaGet(e, callback) {
-  return jsonResponse({ success: false, error: 'sendEmail debe usar POST' }, callback);
+  try {
+    // Reconstruir el objeto data desde los parametros GET
+    var data = {
+      action: 'sendEmail',
+      sendId: e.parameter.sendId || '',
+      sendDate: e.parameter.sendDate || new Date().toISOString(),
+      subject: e.parameter.subject || '',
+      to: e.parameter.to || '',
+      htmlContent: e.parameter.htmlContent || '',
+      clientName: e.parameter.clientName || '',
+      empresa: e.parameter.empresa || ''
+    };
+
+    // Parsear blocks si viene como JSON string
+    if (e.parameter.blocks) {
+      try {
+        data.blocks = JSON.parse(e.parameter.blocks);
+      } catch (er) {
+        data.blocks = [];
+      }
+    }
+
+    // Parsear recipients si viene como JSON string
+    if (e.parameter.recipients) {
+      try {
+        data.recipients = JSON.parse(e.parameter.recipients);
+        // Por seguridad, limitar cantidad de recipients via GET
+        if (data.recipients && data.recipients.length > 50) {
+          data.recipients = data.recipients.slice(0, 50);
+        }
+      } catch (er) {
+        data.recipients = null;
+      }
+    }
+
+    return sendEmailAndLog(data);
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.toString() }, callback);
+  }
 }
 
 function handleLogSendViaGet(e, callback) {

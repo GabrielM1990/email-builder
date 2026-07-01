@@ -3,7 +3,7 @@
 // ============================================
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtdi9G80oTWiK2sdDDKrx_qauETrJwNnYrSuHXLAf-mo4DG13YoolAJE28tXe2siMwdQ/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOKX52v4hw55C9vy3C0AwwRMG2VlHbR4eC8986bRirOu3HTGLfgTzbIR3ZlUxaxk0hVQ/exec';
 var API_KEY = 'kudos_key_8fH3mK9wPq';
 
 var developments = [];
@@ -508,7 +508,7 @@ function renderClientSelector() {
         var originalIdx = clients.findIndex(function(c) { return c.email === client.email; });
         var div = document.createElement('div');
         div.className = 'client-item';
-        div.innerHTML = '<input type="checkbox" class="client-checkbox" id="client_' + originalIdx + '" value="' + originalIdx + '" checked><label for="client_' + originalIdx + '" style="cursor:pointer;"><strong>' + escapeHtml(client.nombre) + '</strong><br><small>' + escapeHtml(client.email) + ' | ' + escapeHtml(client.empresa) + '</small></label>';
+        div.innerHTML = '<input type="checkbox" class="client-checkbox" id="client_' + originalIdx + '" value="' + originalIdx + '"><label for="client_' + originalIdx + '" style="cursor:pointer;"><strong>' + escapeHtml(client.nombre) + '</strong><br><small>' + escapeHtml(client.email) + ' | ' + escapeHtml(client.empresa) + '</small></label>';
         var strongEl = div.querySelector('strong');
         strongEl.style.cursor = 'pointer';
         strongEl.style.color = '#1a73e8';
@@ -780,9 +780,9 @@ async function sendEmails() {
         await new Promise(function(r) { setTimeout(r, 50); }); // dejar que el DOM se actualice
     }
 
-    // Enviar al Apps Script via JSONP
+    // Enviar al Apps Script via POST (no-cors porque Apps Script no devuelve CORS headers)
     try {
-        var result = await postToAppsScript({
+        var postBody = JSON.stringify({
             apiKey: API_KEY,
             action: 'sendEmail',
             sendId: sendId,
@@ -791,19 +791,21 @@ async function sendEmails() {
             blocks: blocksData,
             recipients: recipientsWithHTML
         });
-        if (result && result.success) {
-            addSend(sendData);
-            showToast('Correos enviados correctamente a ' + selectedClients.length + ' destinatario(s)', 'success');
-        } else {
-            addSend(sendData);
-            var errMsg = (result && result.error) || 'Error desconocido';
-            showToast('El servidor reporto un error: ' + errMsg + '. Datos guardados localmente.', 'warning');
-            showToast('Reintenta con Sincronizar para actualizar.', 'info');
-        }
-    } catch (error) {
-        showToast('Error de conexion al enviar. Datos guardados localmente.', 'error');
-        showToast('Reintenta con Sincronizar cuando tengas conexion.', 'warning');
+
+        await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: postBody
+        });
+
         addSend(sendData);
+        showToast('Solicitud de envio enviada a ' + selectedClients.length + ' destinatario(s)', 'success');
+        showToast('Los emails pueden tardar unos minutos en llegar. Usa Sincronizar para ver el estado.', 'info');
+    } catch (error) {
+        addSend(sendData);
+        showToast('Error de conexion al enviar. Datos guardados localmente.', 'error');
+        showToast('Usa Sincronizar cuando tengas conexion para actualizar.', 'warning');
     }
 
     sendButton.innerHTML = originalHTML;
