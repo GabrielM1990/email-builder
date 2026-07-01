@@ -460,7 +460,8 @@ function renderSidebar() {
             imgHtml = '<img src="' + safeUrl + '" alt="' + escapeHtml(dev.nombre) + '" style="max-width:100%;border-radius:6px;margin-bottom:8px;" loading="lazy">';
         }
         var linkUrl = dev.link.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        block.innerHTML = '<div class="block-header"><h3>' + escapeHtml(dev.nombre) + '</h3><button class="add-to-email-btn" data-dev-id="' + escapeHtml(dev.id) + '">+ Agregar</button></div><div class="summary">' + escapeHtml(dev.resumen || 'Sin resumen') + '</div>' + imgHtml + '<div class="link"><a href="' + linkUrl + '" target="_blank">Ver desarrollo</a></div>';
+        var segBadge = getDevSeguimientoBadge(dev);
+        block.innerHTML = '<div class="block-header"><h3>' + escapeHtml(dev.nombre) + '</h3><div class="block-header-right">' + segBadge + '<button class="add-to-email-btn" data-dev-id="' + escapeHtml(dev.id) + '">+ Agregar</button></div></div><div class="summary">' + escapeHtml(dev.resumen || 'Sin resumen') + '</div>' + imgHtml + '<div class="link"><a href="' + linkUrl + '" target="_blank">Ver desarrollo</a></div>';
         block.addEventListener('dragstart', handleDragStart);
         block.addEventListener('dragend', handleDragEnd);
         block.querySelector('.add-to-email-btn').addEventListener('click', function(e) {
@@ -538,9 +539,10 @@ function renderClientSelector() {
         selectAllCheckbox.addEventListener('change', function(e) {
             document.querySelectorAll('.client-checkbox').forEach(function(cb) { cb.checked = e.target.checked; });
             updateSelectionInfo();
+            renderSidebar();
         });
     }
-    document.querySelectorAll('.client-checkbox').forEach(function(cb) { cb.addEventListener('change', function() { updateSelectionInfo(); }); });
+    document.querySelectorAll('.client-checkbox').forEach(function(cb) { cb.addEventListener('change', function() { updateSelectionInfo(); renderSidebar(); }); });
     updateSelectionInfo();
 }
 
@@ -550,6 +552,63 @@ function updateSelectionInfo() {
     if (infoDiv) infoDiv.textContent = selectedCount + ' cliente' + (selectedCount !== 1 ? 's' : '') + ' seleccionado' + (selectedCount !== 1 ? 's' : '');
 }
 
+// ============================================
+// SEGUIMIENTO - Integración con Composer
+// ============================================
+function getSelectedClientStores() {
+    var checkboxes = document.querySelectorAll('.client-checkbox:checked');
+    if (!checkboxes.length) return [];
+    var stores = [];
+    checkboxes.forEach(function(cb) {
+        var idx = parseInt(cb.value);
+        var client = clients[idx];
+        if (client && client.nombre) {
+            var storeName = client.nombre.trim().toLowerCase();
+            // Match against known tiendas from masterData
+            var matched = masterData.tiendas.filter(function(t) {
+                return t.toLowerCase() === storeName;
+            });
+            stores = stores.concat(matched);
+        }
+    });
+    return stores;
+}
+
+function getDevStatusForStore(dev, store) {
+    if (!dev || !store || !masterData.desarrollos) return '';
+    // Match by titulo contained in nombre, or by codigo contained in nombre
+    var devName = (dev.nombre || '').toLowerCase();
+    var md = masterData.desarrollos.find(function(d) {
+        var dTitulo = (d.titulo || '').toLowerCase();
+        var dCodigo = (d.codigo || '').toLowerCase();
+        return devName.indexOf(dTitulo) !== -1 || devName.indexOf(dCodigo) !== -1;
+    });
+    if (md && md.estados && md.estados[store]) {
+        return md.estados[store];
+    }
+    return '';
+}
+
+function getDevSeguimientoBadge(dev) {
+    var stores = getSelectedClientStores();
+    if (!stores.length) return '';
+    var statuses = {};
+    stores.forEach(function(s) {
+        var st = getDevStatusForStore(dev, s);
+        if (st) statuses[s] = st;
+    });
+    if (!Object.keys(statuses).length) return '';
+
+    var isImplemented = Object.values(statuses).every(function(v) { return v === 'Implementado'; });
+    var badgeClass = isImplemented ? 'seg-dev-badge implemented' : 'seg-dev-badge';
+    var icon = isImplemented ? 'fa-check-circle' : 'fa-info-circle';
+    var label = Object.values(statuses).join(', ');
+    return '<span class="' + badgeClass + '" title="' + escapeHtml(label) + '"><i class="fas ' + icon + '"></i></span>';
+}
+
+// ============================================
+// RENDERIZADO DE EMAIL
+// ============================================
 function renderEmailBlocks() {
     var container = document.getElementById('email-blocks');
     container.innerHTML = '';
@@ -611,6 +670,17 @@ function getCurrentEmailBlocks() {
 function addBlockById(devId) {
     var dev = developments.find(function(d) { return d.id === devId; });
     if (!dev) return;
+    var stores = getSelectedClientStores();
+    if (stores.length) {
+        var implementedStores = [];
+        stores.forEach(function(s) {
+            var st = getDevStatusForStore(dev, s);
+            if (st === 'Implementado') implementedStores.push(s);
+        });
+        if (implementedStores.length) {
+            showToast('"' + dev.nombre + '" ya implementado en ' + implementedStores.join(', '), 'warning');
+        }
+    }
     var savedBlocks = JSON.parse(localStorage.getItem('emailBlocks') || '[]');
     savedBlocks.push({ devId: devId });
     localStorage.setItem('emailBlocks', JSON.stringify(savedBlocks));

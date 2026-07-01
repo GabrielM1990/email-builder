@@ -915,18 +915,17 @@ function getMasterData(e, callback) {
       return jsonResponse({ success: true, tiendas: [], desarrollos: [] }, callback);
     }
 
-    // Row 6 (0-indexed) = headers: Codigo (col B), Titulo (col C), tiendas desde col D
-    // Row 7 (0-indexed) = headers con Codigo(col B), Titulo(col C), tiendas desde col D
-    var headerRow = data[7];
+    // Fila 7 (Excel) = indice 6 = headers: Codigo(col B), Titulo(col C), tiendas desde col D
+    var headerRow = data[6];
     var tiendas = [];
     for (var c = 3; c < headerRow.length; c++) {
       var nombre = headerRow[c].toString().trim();
       if (nombre) tiendas.push(nombre);
     }
 
-    // Row 7 (0-indexed) = PM names (sub-header, lo ignoramos pero podria usarse)
+    // Fila 8 (Excel) = indice 7 = PM names (opcional)
 
-    // Data rows desde row 8 (0-indexed)
+    // Data rows desde fila 9 (Excel) = indice 8
     var desarrollos = [];
     for (var r = 8; r < data.length; r++) {
       var codigo = (data[r][1] || '').toString().trim();
