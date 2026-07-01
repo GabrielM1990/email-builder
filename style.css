@@ -1792,10 +1792,6 @@ body {
     background: white;
     border-radius: 12px;
     border: 1px solid #e0e0e0;
-    overflow: hidden;
-}
-
-.seg-table-scroll {
     overflow-x: auto;
 }
 
@@ -1803,7 +1799,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    table-layout: fixed;
+    min-width: 600px;
 }
 
 .seg-table th {
@@ -1827,32 +1823,32 @@ body {
 }
 
 .seg-th-code {
-    width: 80px;
+    min-width: 80px;
 }
 
 .seg-td-code {
-    width: 80px;
+    min-width: 80px;
     font-family: monospace;
     font-weight: 600;
     color: #1a73e8;
 }
 
 .seg-th-title {
-    width: auto;
+    min-width: 180px;
 }
 
 .seg-td-title {
-    width: auto;
+    min-width: 180px;
     color: #2c3e50;
 }
 
 .seg-th-store {
-    width: 130px;
+    min-width: 120px;
     text-align: center;
 }
 
 .seg-td-status {
-    width: 130px;
+    min-width: 120px;
     text-align: center;
 }
 

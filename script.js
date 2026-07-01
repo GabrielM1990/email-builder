@@ -1031,7 +1031,7 @@ function renderSeguimiento() {
         'No aplica': { bg: '#fce8e6', text: '#dc3545', icon: 'fa-ban' }
     };
 
-    var html = '<div class="seg-table-scroll"><table class="seg-table">';
+    var html = '<table class="seg-table">';
     html += '<thead><tr><th class="seg-th-code">Codigo</th><th class="seg-th-title">Desarrollo</th>';
     visibleTiendas.forEach(function(t) {
         html += '<th class="seg-th-store">' + escapeHtml(t) + '</th>';
@@ -1039,8 +1039,8 @@ function renderSeguimiento() {
     html += '</tr></thead><tbody>';
 
     filtered.forEach(function(d) {
-        html += '<tr><td class="seg-td-code">' + escapeHtml(d.codigo) + '</td>';
-        html += '<td class="seg-td-title">' + escapeHtml(d.titulo) + '</td>';
+        html += '<tr><td class="seg-td-code">' + escapeHtml(d.codigo) + '&nbsp;</td>';
+        html += '<td class="seg-td-title">' + escapeHtml(d.titulo) + '&nbsp;</td>';
         visibleTiendas.forEach(function(t) {
             var estado = d.estados[t] || '';
             var matchStatus = !statusVal || estado === statusVal;
@@ -1049,13 +1049,15 @@ function renderSeguimiento() {
             html += '<td class="seg-td-status"' + displayStyle + '>';
             if (estado) {
                 html += '<span class="seg-badge" style="background:' + color.bg + ';color:' + color.text + ';"><i class="fas ' + color.icon + '"></i> ' + escapeHtml(estado) + '</span>';
+            } else {
+                html += '&nbsp;';
             }
             html += '</td>';
         });
         html += '</tr>';
     });
 
-    html += '</tbody></table></div>';
+    html += '</tbody></table>';
     wrapper.innerHTML = html;
 
     var countEl = document.getElementById('seg-count');
