@@ -842,6 +842,7 @@ function getDevelopmentsData(e, callback) {
   var descripcionIndex = headers.indexOf('descripcion') !== -1 ? headers.indexOf('descripcion') : (headers.indexOf('description') !== -1 ? headers.indexOf('description') : -1);
   var capturaIndex = headers.indexOf('captura_url') !== -1 ? headers.indexOf('captura_url') : (headers.indexOf('captura') !== -1 ? headers.indexOf('captura') : (headers.indexOf('image') !== -1 ? headers.indexOf('image') : -1));
   var linkIndex = headers.indexOf('link') !== -1 ? headers.indexOf('link') : (headers.indexOf('url') !== -1 ? headers.indexOf('url') : -1);
+  var codigoIndex = headers.indexOf('codigo') !== -1 ? headers.indexOf('codigo') : -1;
 
   var developments = [];
   for (var i = 1; i < data.length; i++) {
@@ -854,6 +855,7 @@ function getDevelopmentsData(e, callback) {
 
     developments.push({
       id: 'dev_' + i + '_' + Date.now(),
+      codigo: codigoIndex >= 0 ? data[i][codigoIndex].toString().trim() : '',
       nombre: nombre,
       resumen: resumenIndex >= 0 ? data[i][resumenIndex].toString().trim() : '',
       descripcion: descripcionIndex >= 0 ? data[i][descripcionIndex].toString().trim() : '',

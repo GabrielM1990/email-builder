@@ -591,7 +591,19 @@ function getSelectedClientStores() {
 
 function getDevStatusForStore(dev, store) {
     if (!dev || !store || !masterData.desarrollos) return '';
-    // Match by titulo contained in nombre, or by codigo contained in nombre
+    // 1. Match exacto por codigo (nuevo: columna codigo en sheet Desarrollos)
+    var devCodigo = (dev.codigo || '').trim().toLowerCase();
+    if (devCodigo) {
+        var byCode = masterData.desarrollos.find(function(d) {
+            return (d.codigo || '').toLowerCase() === devCodigo;
+        });
+        if (byCode && byCode.estados && byCode.estados[store]) {
+            return byCode.estados[store];
+        }
+        // if codigo exists but no match, return empty (no fuzzy fallback when codigo is present)
+        return '';
+    }
+    // 2. Fallback: match por nombre (fuzzy)
     var devName = (dev.nombre || '').toLowerCase();
     var md = masterData.desarrollos.find(function(d) {
         var dTitulo = (d.titulo || '').toLowerCase();
