@@ -457,7 +457,7 @@ function renderSidebar() {
         var imgHtml = '';
         if (dev.captura_url) {
             var safeUrl = dev.captura_url.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            imgHtml = '<img src="' + safeUrl + '" alt="' + escapeHtml(dev.nombre) + '" onerror="this.src=\'https://via.placeholder.com/300x150\'" style="max-width:100%;border-radius:6px;margin-bottom:8px;">';
+            imgHtml = '<img src="' + safeUrl + '" alt="' + escapeHtml(dev.nombre) + '" style="max-width:100%;border-radius:6px;margin-bottom:8px;" loading="lazy">';
         }
         var linkUrl = dev.link.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         block.innerHTML = '<div class="block-header"><h3>' + escapeHtml(dev.nombre) + '</h3><button class="add-to-email-btn" data-dev-id="' + escapeHtml(dev.id) + '">+ Agregar</button></div><div class="summary">' + escapeHtml(dev.resumen || 'Sin resumen') + '</div>' + imgHtml + '<div class="link"><a href="' + linkUrl + '" target="_blank">Ver desarrollo</a></div>';

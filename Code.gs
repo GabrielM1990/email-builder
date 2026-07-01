@@ -440,15 +440,10 @@ function handleTrackingPixel(e) {
 // ============================================
 function isUrlSafe(url) {
   if (!url) return true;
-  try {
-    var parsed = UrlFetchApp.getRequest(url);
-    var protocol = url.toLowerCase().substring(0, 8);
-    if (protocol.indexOf('http') !== 0) return false;
-    if (url.length > 2000) return false;
-    return true;
-  } catch (e) {
-    return false;
-  }
+  if (url.length > 2000) return false;
+  var lower = url.toLowerCase();
+  if (lower.indexOf('http://') !== 0 && lower.indexOf('https://') !== 0) return false;
+  return true;
 }
 
 function handleClickRedirect(e) {
@@ -856,7 +851,7 @@ function getDevelopmentsData(e, callback) {
       nombre: nombre,
       resumen: resumenIndex >= 0 ? data[i][resumenIndex].toString().trim() : '',
       descripcion: descripcionIndex >= 0 ? data[i][descripcionIndex].toString().trim() : '',
-      captura_url: 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(nombre.substring(0, 30)),
+      captura_url: '',
       link: actualLink
     });
   }
