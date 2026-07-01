@@ -1027,20 +1027,44 @@ function renderSeguimientoDashboard() {
         var barColor = pct >= 75 ? '#137333' : pct >= 50 ? '#b06000' : pct >= 25 ? '#e37400' : '#dc3545';
 
         html += '<div class="seg-dash-card">';
-        html += '<div class="seg-dash-card-header">' + escapeHtml(tienda) + '</div>';
+        html += '<div class="seg-dash-card-header" data-store="' + escapeHtml(tienda) + '">' + escapeHtml(tienda) + '</div>';
         html += '<div class="seg-dash-stat"><span class="seg-dash-num">' + implemented + '</span><span class="seg-dash-label">/' + totalDevs + ' impl.</span></div>';
         html += '<div class="seg-dash-bar"><div class="seg-dash-bar-fill" style="width:' + pct + '%;background:' + barColor + ';"></div></div>';
         html += '<div class="seg-dash-tags">';
         Object.keys(statusLabels).forEach(function(st) {
             var c = counts[st] || 0;
             if (c > 0) {
-                html += '<span class="seg-dash-tag" style="color:' + (statusColors[st] || '#5f6368') + ';">' + c + ' ' + statusLabels[st] + '</span>';
+                html += '<span class="seg-dash-tag" data-store="' + escapeHtml(tienda) + '" data-status="' + escapeHtml(st) + '" style="color:' + (statusColors[st] || '#5f6368') + ';">' + c + ' ' + statusLabels[st] + '</span>';
             }
         });
         html += '</div></div>';
     });
     html += '</div>';
     el.innerHTML = html;
+
+    // Click handlers via delegation
+    el.querySelectorAll('.seg-dash-tag').forEach(function(tag) {
+        tag.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var store = this.getAttribute('data-store');
+            var status = this.getAttribute('data-status');
+            var storeSelect = document.getElementById('seg-filter-store');
+            var statusSelect = document.getElementById('seg-filter-status');
+            if (storeSelect) storeSelect.value = store;
+            if (statusSelect) statusSelect.value = status;
+            renderSeguimiento();
+        });
+    });
+    el.querySelectorAll('.seg-dash-card-header').forEach(function(hdr) {
+        hdr.addEventListener('click', function() {
+            var store = this.getAttribute('data-store');
+            var storeSelect = document.getElementById('seg-filter-store');
+            if (storeSelect) storeSelect.value = store;
+            var statusSelect = document.getElementById('seg-filter-status');
+            if (statusSelect) statusSelect.value = '';
+            renderSeguimiento();
+        });
+    });
 }
 
 function renderSeguimiento() {

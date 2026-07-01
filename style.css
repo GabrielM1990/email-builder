@@ -1814,6 +1814,11 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.seg-dash-card-header:hover {
+    color: #1a73e8;
 }
 
 .seg-dash-stat {
@@ -1856,6 +1861,11 @@ body {
     background: #f8f9fa;
     padding: 2px 6px;
     border-radius: 4px;
+    cursor: pointer;
+}
+
+.seg-dash-tag:hover {
+    background: #e9ecef;
 }
 
 .seg-table-wrapper {
