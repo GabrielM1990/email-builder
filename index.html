@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kudos Commerce - Email Marketing CRM</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.2/mammoth.browser.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha384-/o6I2CkkWC//PSjvWC/eYN7l3xM3tJm8ZzVkCOfp//W05QcE3mlGskpoHB6XqI+B" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.2/mammoth.browser.min.js" integrity="sha384-PND+HpqAG2y0D5c0mzwZl0nU4JOvCDJ7EoepNUftiijKO5xYCdJ9kiMbAl5tdNkD" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js" integrity="sha384-uLiAv4VcjM5H2Jsqzl8EajEaxPugj1CIzQaCjQ8c5//vC+elhxO5pZfXGxoLQi1W" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" integrity="sha384-D/t0ZMqQW31H3az8ktEiNb39wyKnS82iFY52QPACM+IjKW3jDUhyIgh2PApRqJZs" crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="app-container">
@@ -59,7 +59,7 @@
                             <input type="text" id="search-developments" placeholder="Buscar desarrollos..." class="search-input">
                         </div>
                         <div class="import-section">
-                            <input type="file" id="file-input" accept=".pdf,.pptx,.docx" style="display: none;">
+                            <input type="file" id="file-input" accept=".pdf,.docx" style="display: none;">
                             <button id="import-file-btn" class="import-btn"><i class="fas fa-file-import"></i> Importar archivo</button>
                             <div id="import-preview" class="import-preview" style="display: none;">
                                 <div class="preview-header"><h4>Vista previa</h4><button id="close-preview" class="close-preview">&times;</button></div>
@@ -72,6 +72,9 @@
                         </div>
                     </div>
                     <div class="composer-preview-panel">
+                        <div class="email-subject-line">
+                            <input type="text" id="email-subject" value="Nuevos desarrollos para tu tienda VTEX | Kudos Commerce" placeholder="Asunto del email...">
+                        </div>
                         <div class="email-preview">
                             <div class="email-header">
                                 <h1>Kudos Commerce</h1>
@@ -168,31 +171,31 @@
     </div>
 
     <!-- Modal de Detalle de Envio -->
-    <div id="send-detail-modal" class="modal-overlay" style="display:none;">
+    <div id="send-detail-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modal-send-title">
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h2 id="modal-send-title">Detalle de Env&iacute;o</h2>
-                <button class="modal-close" id="close-send-detail">&times;</button>
+                <button class="modal-close" id="close-send-detail" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body" id="modal-send-body"></div>
         </div>
     </div>
 
     <!-- Modal de Perfil de Cliente -->
-    <div id="client-profile-modal" class="modal-overlay" style="display:none;">
+    <div id="client-profile-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modal-client-title">
         <div class="modal-content modal-xlarge">
             <div class="modal-header">
                 <h2 id="modal-client-title">Perfil de Cliente</h2>
-                <button class="modal-close" id="close-client-profile">&times;</button>
+                <button class="modal-close" id="close-client-profile" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body" id="modal-client-body"></div>
         </div>
     </div>
 
     <!-- Toast Container -->
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" role="alert" aria-live="polite"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.7/Sortable.min.js" integrity="sha384-DgmC6Xe2bSN2WjTDXzWYbUbxyhNP+NNkGDR/g78pCXV7E7rcVTGxVg0uIVCUUcBc" crossorigin="anonymous"></script>
     <script src="script.js"></script>
     <script>
         // Ejecutar router inmediatamente para evitar parpadeo al recargar

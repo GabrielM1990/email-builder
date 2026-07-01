@@ -3,9 +3,8 @@
 // ============================================
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-var SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSaMkkN_vbBOWt8xfuBjrk6egPV-8H0rlVw0eEmcAKIK-7aa_E0bVVGHQGwt_jl1uj4hEz5G82oIVrA/pub?output=csv';
-var CLIENTS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSaMkkN_vbBOWt8xfuBjrk6egPV-8H0rlVw0eEmcAKIK-7aa_E0bVVGHQGwt_jl1uj4hEz5G82oIVrA/pub?gid=1654401836&single=true&output=csv';
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPUkdJc4XINr57b5Uxuohz6GJUTcIW59-2dDS4parofHVqZ67pz2ToHdZTPAlHSEb10A/exec';
+var API_KEY = 'kudos_key_8fH3mK9wPq';
 
 var developments = [];
 var clients = [];
@@ -110,23 +109,6 @@ async function fetchTrackingFromSheet() {
     return getSends();
 }
 
-function getClientHistory(clientEmail) {
-    var sends = getSends();
-    var history = [];
-    sends.forEach(function(send) {
-        var recipient = send.recipients.find(function(r) { return r.email === clientEmail; });
-        if (recipient) {
-            history.push({
-                sendId: send.id, subject: send.subject, date: send.date,
-                status: recipient.status, openCount: recipient.openCount || 0,
-                clickCount: recipient.clickCount || 0, lastEvent: recipient.lastEvent,
-                events: recipient.events || []
-            });
-        }
-    });
-    return history;
-}
-
 function getAnalytics() {
     var sends = getSends();
     var totalSent = 0, totalOpened = 0, totalClicked = 0, totalBounced = 0, totalDelivered = 0;
@@ -226,8 +208,7 @@ async function importFile(file) {
         var text = '';
         if (extension === 'pdf') { text = await extractFromPDF(file); }
         else if (extension === 'docx') { text = await extractFromDOCX(file); }
-        else if (extension === 'pptx') { text = await extractFromPPTX(file); }
-        else { showToast('Formato no soportado. Usa PDF, DOCX o PPTX', 'error'); return; }
+        else { showToast('Formato no soportado. Usa PDF o DOCX', 'error'); return; }
         extractedDevelopments = parseDevelopmentsFromText(text);
         if (extractedDevelopments.length === 0) { showToast('No se encontraron desarrollos en el archivo', 'warning'); return; }
         showPreview(extractedDevelopments);
@@ -254,10 +235,6 @@ async function extractFromDOCX(file) {
     return result.value;
 }
 
-async function extractFromPPTX(file) {
-    return "Procesando PPTX... Los desarrollos se extraeran automaticamente";
-}
-
 function parseDevelopmentsFromText(text) {
     var developmentsFound = [];
     var knownDevelopments = [
@@ -281,9 +258,9 @@ function parseDevelopmentsFromText(text) {
             var linkMatch = fullText.match(/https?:\/\/[^\s\)\n]+/i);
             if (linkMatch) link = linkMatch[0];
             developmentsFound.push({
-                nombre: devName, resumen: summary, descripcion: description,
-                captura_url: 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(devName), link: link
-            });
+                    id: generateDevId(), nombre: devName, resumen: summary, descripcion: description,
+                    captura_url: 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(devName), link: link
+                });
         }
     }
     if (developmentsFound.length === 0) {
@@ -296,10 +273,10 @@ function parseDevelopmentsFromText(text) {
                     var nombre = lines[0].substring(0, 60).replace(/[*_#]/g, '').trim();
                     if (nombre.length > 5 && !nombre.match(/^\d+$/)) {
                         developmentsFound.push({
-                            nombre: nombre, resumen: extractSummary(section),
-                            descripcion: section.substring(0, 500).replace(/[*_#]/g, ''),
-                            captura_url: 'https://via.placeholder.com/400x200', link: '#'
-                        });
+                                id: generateDevId(), nombre: nombre, resumen: extractSummary(section),
+                                descripcion: section.substring(0, 500).replace(/[*_#]/g, ''),
+                                captura_url: 'https://via.placeholder.com/400x200', link: '#'
+                            });
                     }
                 }
             }
@@ -340,9 +317,8 @@ function confirmImport() {
     var existingNames = new Set(developments.map(function(d) { return d.nombre; }));
     var newDevelopments = selectedDevelopments.filter(function(d) { return !existingNames.has(d.nombre); });
     developments.push.apply(developments, newDevelopments);
-    localStorage.setItem('importedDevelopments', JSON.stringify(developments));
+    localStorage.setItem('allDevelopments', JSON.stringify(developments));
     renderSidebar();
-    document.getElementById('import-preview').style.display = 'none';
     showToast(newDevelopments.length + ' desarrollos importados correctamente', 'success');
     generateCSV(newDevelopments);
 }
@@ -390,17 +366,16 @@ async function forceReloadData() {
     btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Limpiando cache...';
     btn.disabled = true;
     try {
+        localStorage.removeItem('allDevelopments');
         localStorage.removeItem('importedDevelopments');
         localStorage.removeItem('backupDevelopments');
-        var urlWithTimestamp = SHEET_URL + '&t=' + new Date().getTime();
-        var response = await fetch(urlWithTimestamp, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-        if (response.ok) {
-            var csv = await response.text();
-            developments = parseCSV(csv);
+        var data = await fetchFromSheet('getDevelopments');
+        if (data && data.success && data.developments && data.developments.length > 0) {
+            developments = assignDevIds(data.developments);
             localStorage.setItem('backupDevelopments', JSON.stringify(developments));
             renderSidebar();
             showToast('Recarga completa: ' + developments.length + ' desarrollos cargados', 'success');
-        } else { throw new Error('HTTP ' + response.status); }
+        } else { throw new Error('Sin datos'); }
     } catch (error) {
         showToast('Error al recargar: ' + error.message, 'error');
     } finally { btn.innerHTML = originalText; btn.disabled = false; }
@@ -413,13 +388,12 @@ async function loadDevelopments() {
     var container = document.getElementById('blocks-list');
     container.innerHTML = '<div class="loading">Cargando desarrollos...</div>';
     try {
-        var urlWithTimestamp = SHEET_URL + '&t=' + new Date().getTime();
-        var response = await fetch(urlWithTimestamp, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-        if (response.ok) {
-            var csv = await response.text();
-            if (csv.trim().length === 0) throw new Error('CSV vacio');
-            developments = parseCSV(csv);
-        } else { throw new Error('HTTP ' + response.status); }
+        var data = await fetchFromSheet('getDevelopments');
+        if (data && data.success && data.developments && data.developments.length > 0) {
+            developments = assignDevIds(data.developments);
+        } else {
+            throw new Error('Sin datos');
+        }
     } catch (error) {
         developments = getMockDevelopments();
         mostrarError('Usando datos de ejemplo para desarrollos');
@@ -440,17 +414,12 @@ async function loadClients() {
         } catch (e) {}
     }
     try {
-        var urlWithTimestamp = CLIENTS_SHEET_URL + '&t=' + new Date().getTime();
-        var response = await fetch(urlWithTimestamp, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-        if (response.ok) {
-            var csv = await response.text();
-            var parsedClients = parseClientsFromCSV(csv);
-            if (parsedClients.length > 0) {
-                clients = parsedClients;
-                localStorage.setItem('clientesData', JSON.stringify(clients));
-                renderClientSelector();
-                return;
-            }
+        var data = await fetchFromSheet('getClients');
+        if (data && data.success && data.clients && data.clients.length > 0) {
+            clients = data.clients;
+            localStorage.setItem('clientesData', JSON.stringify(clients));
+            renderClientSelector();
+            return;
         }
     } catch (error) { console.error('Error cargando clientes:', error); }
     clients = [
@@ -462,31 +431,6 @@ async function loadClients() {
     ];
     localStorage.setItem('clientesData', JSON.stringify(clients));
     renderClientSelector();
-}
-
-function parseClientsFromCSV(csv) {
-    var lines = csv.split('\n').filter(function(line) { return line.trim(); });
-    if (lines.length < 2) return [];
-    var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase().replace(/^\uFEFF/, ''); });
-    var nombreIndex = headers.findIndex(function(h) { return h.includes('nombre') || h.includes('name') || h.includes('cliente'); });
-    var emailIndex = headers.findIndex(function(h) { return h.includes('email') || h.includes('correo') || h.includes('mail'); });
-    var empresaIndex = headers.findIndex(function(h) { return h.includes('empresa') || h.includes('company'); });
-    if (emailIndex === -1) return [];
-    var clientsList = [];
-    for (var i = 1; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (!line) continue;
-        var values = parseCSVLine(line);
-        var email = emailIndex >= 0 && values[emailIndex] ? values[emailIndex].trim() : '';
-        if (email && email.includes('@')) {
-            clientsList.push({
-                nombre: nombreIndex >= 0 && values[nombreIndex] ? values[nombreIndex].trim() : email.split('@')[0],
-                email: email,
-                empresa: empresaIndex >= 0 && values[empresaIndex] ? values[empresaIndex].trim() : 'Cliente'
-            });
-        }
-    }
-    return clientsList;
 }
 
 // ============================================
@@ -506,18 +450,30 @@ function renderSidebar() {
         return;
     }
     filtered.forEach(function(dev) {
-        var originalIdx = developments.findIndex(function(d) { return d.nombre === dev.nombre; });
         var block = document.createElement('div');
         block.className = 'block-card';
         block.setAttribute('draggable', 'true');
-        block.setAttribute('data-dev-index', originalIdx);
-        block.innerHTML = '<div class="block-header"><h3>' + escapeHtml(dev.nombre) + '</h3><button class="add-to-email-btn" data-dev-index="' + originalIdx + '">+ Agregar</button></div><div class="summary">' + escapeHtml(dev.resumen || 'Sin resumen') + '</div>' + (dev.captura_url ? '<img src="' + dev.captura_url + '" alt="' + escapeHtml(dev.nombre) + '" onerror="this.src=\'https://via.placeholder.com/300x150\'" style="max-width:100%;border-radius:6px;margin-bottom:8px;">' : '') + '<div class="link"><a href="' + dev.link + '" target="_blank">Ver desarrollo</a></div>';
+        block.setAttribute('data-dev-id', dev.id || escapeHtml(dev.nombre));
+        var imgHtml = '';
+        if (dev.captura_url) {
+            var safeUrl = dev.captura_url.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            imgHtml = '<img src="' + safeUrl + '" alt="' + escapeHtml(dev.nombre) + '" onerror="this.src=\'https://via.placeholder.com/300x150\'" style="max-width:100%;border-radius:6px;margin-bottom:8px;">';
+        }
+        var linkUrl = dev.link.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        block.innerHTML = '<div class="block-header"><h3>' + escapeHtml(dev.nombre) + '</h3><button class="add-to-email-btn" data-dev-id="' + escapeHtml(dev.id) + '">+ Agregar</button></div><div class="summary">' + escapeHtml(dev.resumen || 'Sin resumen') + '</div>' + imgHtml + '<div class="link"><a href="' + linkUrl + '" target="_blank">Ver desarrollo</a></div>';
         block.addEventListener('dragstart', handleDragStart);
         block.addEventListener('dragend', handleDragEnd);
-        block.querySelector('.add-to-email-btn').addEventListener('click', function(e) { e.stopPropagation(); addBlock(originalIdx); });
+        block.querySelector('.add-to-email-btn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            var id = this.getAttribute('data-dev-id');
+            if (id) addBlockById(id);
+        });
         container.appendChild(block);
     });
 }
+
+var CLIENTS_PAGE_SIZE = 50;
+var clientsPageLoaded = CLIENTS_PAGE_SIZE;
 
 function renderClientSelector() {
     var container = document.getElementById('clients-list');
@@ -528,12 +484,19 @@ function renderClientSelector() {
         filtered = clients.filter(function(c) {
             return c.nombre.toLowerCase().includes(clientSearchTerm.toLowerCase()) || c.email.toLowerCase().includes(clientSearchTerm.toLowerCase()) || c.empresa.toLowerCase().includes(clientSearchTerm.toLowerCase());
         });
+        clientsPageLoaded = filtered.length;
+    } else {
+        clientsPageLoaded = Math.min(clientsPageLoaded, filtered.length);
     }
     if (filtered.length === 0) {
         container.innerHTML = '<div class="loading">No hay clientes que coincidan</div>';
         updateSelectionInfo();
         return;
     }
+
+    var showing = Math.min(clientsPageLoaded, filtered.length);
+    var visible = filtered.slice(0, showing);
+
     var selectAllDiv = document.createElement('div');
     selectAllDiv.className = 'client-item';
     selectAllDiv.style.background = '#e9ecef';
@@ -541,12 +504,11 @@ function renderClientSelector() {
     selectAllDiv.innerHTML = '<input type="checkbox" id="select-all-clients" style="margin-right:10px;"><label for="select-all-clients" style="font-weight:bold;">Seleccionar todos (' + filtered.length + ')</label>';
     container.appendChild(selectAllDiv);
 
-    filtered.forEach(function(client) {
+    visible.forEach(function(client) {
         var originalIdx = clients.findIndex(function(c) { return c.email === client.email; });
         var div = document.createElement('div');
         div.className = 'client-item';
         div.innerHTML = '<input type="checkbox" class="client-checkbox" id="client_' + originalIdx + '" value="' + originalIdx + '" checked><label for="client_' + originalIdx + '" style="cursor:pointer;"><strong>' + escapeHtml(client.nombre) + '</strong><br><small>' + escapeHtml(client.email) + ' | ' + escapeHtml(client.empresa) + '</small></label>';
-        // Click on client name to show profile
         var strongEl = div.querySelector('strong');
         strongEl.style.cursor = 'pointer';
         strongEl.style.color = '#1a73e8';
@@ -556,6 +518,20 @@ function renderClientSelector() {
         });
         container.appendChild(div);
     });
+
+    if (showing < filtered.length) {
+        var moreDiv = document.createElement('div');
+        moreDiv.className = 'client-item';
+        moreDiv.style.textAlign = 'center';
+        moreDiv.style.background = 'transparent';
+        moreDiv.style.border = 'none';
+        moreDiv.innerHTML = '<button id="load-more-clients" class="btn btn-ghost" style="width:100%;justify-content:center;"><i class="fas fa-chevron-down"></i> Mostrar mas (' + (filtered.length - showing) + ' restantes)</button>';
+        container.appendChild(moreDiv);
+        document.getElementById('load-more-clients').addEventListener('click', function() {
+            clientsPageLoaded += CLIENTS_PAGE_SIZE;
+            renderClientSelector();
+        });
+    }
 
     var selectAllCheckbox = document.getElementById('select-all-clients');
     if (selectAllCheckbox) {
@@ -582,17 +558,24 @@ function renderEmailBlocks() {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-thumbtack empty-icon"></i><p>Arrastra desarrollos aqui</p><small>o haz clic en "+ Agregar"</small></div>';
     }
     savedBlocks.forEach(function(block, idx) {
-        var dev = developments[block.devIndex];
+        var dev = developments.find(function(d) { return d.id === block.devId; });
         if (!dev) return;
         var blockDiv = document.createElement('div');
         blockDiv.className = 'block-item';
-        blockDiv.setAttribute('data-idx', idx);
-        blockDiv.innerHTML = '<button class="remove-block" data-idx="' + idx + '">&times;</button><h3>' + escapeHtml(dev.nombre) + '</h3><div class="description">' + escapeHtml(dev.descripcion || dev.resumen || 'Sin descripcion') + '</div><a href="' + dev.link + '" target="_blank" class="block-link">Ver mas</a>';
+        blockDiv.setAttribute('data-block-idx', idx);
+        blockDiv.innerHTML = '<button class="remove-block" data-idx="' + idx + '">&times;</button><h3>' + escapeHtml(dev.nombre) + '</h3><div class="description">' + escapeHtml(dev.descripcion || dev.resumen || 'Sin descripcion') + '</div><a href="' + dev.link.replace(/"/g, '&quot;') + '" target="_blank" class="block-link">Ver mas</a>';
         blockDiv.querySelector('.remove-block').addEventListener('click', function(e) { e.stopPropagation(); removeBlock(idx); });
         container.appendChild(blockDiv);
     });
     if (sortable) sortable.destroy();
-    sortable = new Sortable(container, { animation: 150, onEnd: function() { saveOrder(); } });
+    sortable = null;
+    if (typeof Sortable !== 'undefined') {
+        try {
+            sortable = new Sortable(container, { animation: 150, onEnd: function() { saveOrder(); } });
+        } catch (e) {
+            console.log('SortableJS no disponible');
+        }
+    }
 }
 
 function removeBlock(idx) {
@@ -608,7 +591,7 @@ function saveOrder() {
     var newOrder = [];
     var blocks = JSON.parse(localStorage.getItem('emailBlocks') || '[]');
     items.forEach(function(item) {
-        var idx = parseInt(item.getAttribute('data-idx'));
+        var idx = parseInt(item.getAttribute('data-block-idx'));
         if (!isNaN(idx) && blocks[idx]) newOrder.push(blocks[idx]);
     });
     localStorage.setItem('emailBlocks', JSON.stringify(newOrder));
@@ -619,18 +602,20 @@ function getCurrentEmailBlocks() {
     var blocks = [];
     var savedBlocks = JSON.parse(localStorage.getItem('emailBlocks') || '[]');
     savedBlocks.forEach(function(block) {
-        var dev = developments[block.devIndex];
+        var dev = developments.find(function(d) { return d.id === block.devId; });
         if (dev) blocks.push(dev);
     });
     return blocks;
 }
 
-function addBlock(devIndex) {
+function addBlockById(devId) {
+    var dev = developments.find(function(d) { return d.id === devId; });
+    if (!dev) return;
     var savedBlocks = JSON.parse(localStorage.getItem('emailBlocks') || '[]');
-    savedBlocks.push({ devIndex: devIndex });
+    savedBlocks.push({ devId: devId });
     localStorage.setItem('emailBlocks', JSON.stringify(savedBlocks));
     renderEmailBlocks();
-    showToast('Desarrollo agregado al email', 'success');
+    showToast('"' + dev.nombre + '" agregado al email', 'success');
 }
 
 function clearAllBlocks() {
@@ -641,52 +626,24 @@ function clearAllBlocks() {
 }
 
 function loadImportedDevelopments() {
-    var saved = localStorage.getItem('importedDevelopments');
+    var saved = localStorage.getItem('allDevelopments') || localStorage.getItem('importedDevelopments');
     if (saved) {
         var imported = JSON.parse(saved);
-        var existingNames = new Set(developments.map(function(d) { return d.nombre; }));
-        var newDevelopments = imported.filter(function(d) { return !existingNames.has(d.nombre); });
+        var existingIds = new Set(developments.map(function(d) { return d.id; }));
+        var newDevelopments = imported.filter(function(d) { return !existingIds.has(d.id); });
         developments.push.apply(developments, newDevelopments);
     }
 }
 
-function parseCSV(csv) {
-    var lines = csv.split('\n').filter(function(line) { return line.trim(); });
-    if (lines.length < 2) return [];
-    var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase().replace(/^\uFEFF/, ''); });
-    var nombreIndex = headers.findIndex(function(h) { return h.includes('nombre') || h.includes('name'); });
-    var resumenIndex = headers.findIndex(function(h) { return h.includes('resumen') || h.includes('summary'); });
-    var descripcionIndex = headers.findIndex(function(h) { return h.includes('descripcion') || h.includes('description'); });
-    var capturaIndex = headers.findIndex(function(h) { return h.includes('captura') || h.includes('image'); });
-    var linkIndex = headers.findIndex(function(h) { return h.includes('link') || h.includes('url'); });
-    var data = [];
-    for (var i = 1; i < lines.length; i++) {
-        var values = parseCSVLine(lines[i]);
-        if (values.length > 0 && values[0].trim()) {
-            data.push({
-                nombre: nombreIndex >= 0 ? (values[nombreIndex] || 'Sin titulo').trim() : 'Desarrollo ' + i,
-                resumen: resumenIndex >= 0 ? (values[resumenIndex] || '').trim() : '',
-                descripcion: descripcionIndex >= 0 ? (values[descripcionIndex] || '').trim() : '',
-                captura_url: capturaIndex >= 0 ? (values[capturaIndex] || 'https://via.placeholder.com/300x150').trim() : 'https://via.placeholder.com/300x150',
-                link: linkIndex >= 0 ? (values[linkIndex] || '#').trim() : '#'
-            });
-        }
-    }
-    return data;
+function generateDevId() {
+    return 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-function parseCSVLine(line) {
-    var result = [];
-    var inQuotes = false;
-    var currentValue = '';
-    for (var i = 0; i < line.length; i++) {
-        var char = line[i];
-        if (char === '"') { inQuotes = !inQuotes; }
-        else if (char === ',' && !inQuotes) { result.push(currentValue); currentValue = ''; }
-        else { currentValue += char; }
-    }
-    result.push(currentValue);
-    return result.map(function(val) { return val.replace(/^"|"$/g, '').trim(); });
+function assignDevIds(devs) {
+    return devs.map(function(d) {
+        if (!d.id) d.id = generateDevId();
+        return d;
+    });
 }
 
 // ============================================
@@ -694,7 +651,8 @@ function parseCSVLine(line) {
 // ============================================
 function handleDragStart(e) {
     draggedItem = this;
-    e.dataTransfer.setData('text/plain', this.getAttribute('data-dev-index'));
+    var devId = this.getAttribute('data-dev-id');
+    if (devId) e.dataTransfer.setData('text/plain', devId);
     e.dataTransfer.effectAllowed = 'copy';
 }
 
@@ -706,13 +664,60 @@ function setupDropZone() {
     dropZone.addEventListener('dragleave', function() { dropZone.style.background = ''; });
     dropZone.addEventListener('drop', function(e) {
         e.preventDefault(); dropZone.style.background = '';
-        if (draggedItem) { var devIndex = parseInt(draggedItem.getAttribute('data-dev-index')); if (!isNaN(devIndex)) addBlock(devIndex); }
+        if (draggedItem) {
+            var devId = draggedItem.getAttribute('data-dev-id');
+            if (devId) addBlockById(devId);
+        }
     });
 }
 
 // ============================================
 // ENVIO DE CORREOS CON TRACKING
 // ============================================
+function postToAppsScript(data) {
+    return new Promise(function(resolve) {
+        var callbackName = 'kudosPostCallback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        var params = 'action=' + encodeURIComponent(data.action) +
+            '&callback=' + callbackName +
+            '&t=' + Date.now() +
+            '&apiKey=' + encodeURIComponent(data.apiKey || '') +
+            '&sendId=' + encodeURIComponent(data.sendId || '') +
+            '&sendDate=' + encodeURIComponent(data.sendDate || '') +
+            '&subject=' + encodeURIComponent(data.subject || '') +
+            '&blocks=' + encodeURIComponent(JSON.stringify(data.blocks || [])) +
+            '&recipients=' + encodeURIComponent(JSON.stringify(data.recipients || [])) +
+            '&to=' + encodeURIComponent(data.to || '') +
+            '&htmlContent=' + encodeURIComponent(data.htmlContent || '');
+
+        window[callbackName] = function(response) {
+            delete window[callbackName];
+            var el = document.getElementById(callbackName);
+            if (el) el.remove();
+            resolve(response);
+        };
+
+        var script = document.createElement('script');
+        script.id = callbackName;
+        script.src = APPS_SCRIPT_URL + '?' + params;
+        script.onerror = function() {
+            delete window[callbackName];
+            var el = document.getElementById(callbackName);
+            if (el) el.remove();
+            resolve({ success: false, error: 'Error de conexion' });
+        };
+        document.head.appendChild(script);
+
+        setTimeout(function() {
+            if (window[callbackName]) {
+                delete window[callbackName];
+                var el = document.getElementById(callbackName);
+                if (el) el.remove();
+                resolve({ success: false, error: 'Timeout' });
+            }
+        }, 30000);
+    });
+}
+
 async function sendEmails() {
     var selectedClients = [];
     document.querySelectorAll('.client-checkbox:checked').forEach(function(checkbox) {
@@ -723,9 +728,19 @@ async function sendEmails() {
     var blocks = getCurrentEmailBlocks();
     if (blocks.length === 0) { showToast('Agrega al menos un desarrollo al email', 'warning'); return; }
 
+    // Confirmacion antes de enviar
+    if (!confirm('Enviar email a ' + selectedClients.length + ' cliente(s) con ' + blocks.length + ' desarrollo(s)?')) return;
+
     var sendId = generateSendId();
     var sendDate = new Date().toISOString();
-    var subject = 'Nuevos desarrollos para tu tienda VTEX | Kudos Commerce';
+    var subjectEl = document.getElementById('email-subject');
+    var subject = subjectEl ? subjectEl.value.trim() : 'Nuevos desarrollos para tu tienda VTEX | Kudos Commerce';
+    if (!subject) {
+        showToast('Escribe un asunto para el email', 'warning');
+        sendButton.innerHTML = originalHTML;
+        sendButton.disabled = false;
+        return;
+    }
     var blocksData = blocks.map(function(b) { return { nombre: b.nombre, resumen: b.resumen, link: b.link }; });
     var recipients = selectedClients.map(function(client) {
         return { trackingId: generateTrackingId(), email: client.email, nombre: client.nombre, empresa: client.empresa, status: 'sent', openCount: 0, clickCount: 0, lastEvent: sendDate, events: [] };
@@ -751,7 +766,8 @@ async function sendEmails() {
             return '<div style="border:1px solid #e0e0e0;border-radius:8px;padding:15px;margin-bottom:15px;font-family:Arial,sans-serif;"><h3 style="color:#1a73e8;margin-top:0;margin-bottom:10px;">' + escapeHtml(block.nombre) + '</h3><p style="margin:0 0 10px 0;line-height:1.5;">' + escapeHtml(block.descripcion || block.resumen || '') + '</p><a href="' + trackableLink + '" style="color:#1a73e8;text-decoration:none;">Ver desarrollo</a></div>';
         }).join('');
         var trackingPixel = '<img src="' + APPS_SCRIPT_URL + '?action=open&sendId=' + sendId + '&trkId=' + recipient.trackingId + '" width="1" height="1" style="display:none;" />';
-        var emailTemplate = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px 20px;text-align:center;border-radius:12px 12px 0 0;"><h1 style="margin:0;">Kudos Commerce</h1><p style="margin:10px 0 0;">Especialistas en comercio unificado</p></div><div style="padding:20px;border:1px solid #e0e0e0;border-top:none;background:white;"><h2 style="color:#2c3e50;margin-top:0;">Nuevos desarrollos disponibles</h2><div style="margin-top:20px;">' + blocksHTML + '</div><div style="margin-top:30px;padding-top:20px;border-top:1px solid #e0e0e0;font-size:12px;color:#666;text-align:center;"><p>2026 Kudos Commerce - Todos los derechos reservados</p></div></div>' + trackingPixel + '</body></html>';
+        var unsubscribeLink = APPS_SCRIPT_URL + '?action=click&sendId=' + sendId + '&trkId=' + recipient.trackingId + '&url=' + encodeURIComponent('#unsubscribe') + '&block=' + encodeURIComponent('Baja');
+        var emailTemplate = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px 20px;text-align:center;border-radius:12px 12px 0 0;"><h1 style="margin:0;">Kudos Commerce</h1><p style="margin:10px 0 0;">Especialistas en comercio unificado</p></div><div style="padding:20px;border:1px solid #e0e0e0;border-top:none;background:white;"><h2 style="color:#2c3e50;margin-top:0;">Nuevos desarrollos disponibles</h2><div style="margin-top:20px;">' + blocksHTML + '</div><div style="margin-top:30px;padding-top:20px;border-top:1px solid #e0e0e0;font-size:12px;color:#666;text-align:center;"><p>2026 Kudos Commerce - Todos los derechos reservados</p><p style="margin-top:8px;"><a href="' + unsubscribeLink + '" style="color:#999;text-decoration:underline;">Darse de baja</a></p></div></div>' + trackingPixel + '</body></html>';
 
         recipientsWithHTML.push({
             trackingId: recipient.trackingId,
@@ -761,40 +777,42 @@ async function sendEmails() {
             htmlContent: emailTemplate
         });
         sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando ' + (i + 1) + '/' + selectedClients.length + '...';
+        await new Promise(function(r) { setTimeout(r, 50); }); // dejar que el DOM se actualice
     }
 
-    // Enviar todo al Apps Script: envía emails + guarda en Sheets
-    var successCount = 0, errorCount = 0;
+    // Enviar al Apps Script via JSONP
     try {
-        await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'sendEmail',
-                sendId: sendId,
-                sendDate: sendDate,
-                subject: subject,
-                blocks: blocksData,
-                recipients: recipientsWithHTML
-            })
+        var result = await postToAppsScript({
+            apiKey: API_KEY,
+            action: 'sendEmail',
+            sendId: sendId,
+            sendDate: sendDate,
+            subject: subject,
+            blocks: blocksData,
+            recipients: recipientsWithHTML
         });
-        successCount = selectedClients.length;
+        if (result && result.success) {
+            addSend(sendData);
+            showToast('Correos enviados correctamente a ' + selectedClients.length + ' destinatario(s)', 'success');
+        } else {
+            addSend(sendData);
+            var errMsg = (result && result.error) || 'Error desconocido';
+            showToast('El servidor reporto un error: ' + errMsg + '. Datos guardados localmente.', 'warning');
+            showToast('Reintenta con Sincronizar para actualizar.', 'info');
+        }
     } catch (error) {
-        errorCount = selectedClients.length;
-        recipients.forEach(function(r) { r.status = 'bounced'; });
+        showToast('Error de conexion al enviar. Datos guardados localmente.', 'error');
+        showToast('Reintenta con Sincronizar cuando tengas conexion.', 'warning');
+        addSend(sendData);
     }
 
-    // Guardar localmente como cache
-    addSend(sendData);
     sendButton.innerHTML = originalHTML;
     sendButton.disabled = false;
-    if (errorCount === 0) showToast('Se enviaron ' + successCount + ' correos correctamente', 'success');
-    else showToast('Envio: ' + successCount + ' exitosos, ' + errorCount + ' fallidos', 'warning');
     renderHistory(); renderAnalytics(); navigateTo('history');
 }
 
 async function reloadClients() {
+    clientsPageLoaded = CLIENTS_PAGE_SIZE;
     var btn = document.getElementById('reload-clients');
     if (btn) {
         var originalText = btn.innerHTML;
@@ -841,12 +859,14 @@ function downloadHTML() {
 // ============================================
 // UTILIDADES
 // ============================================
-function escapeHtml(text) {
-    if (!text) return '';
+var escapeHtml = (function() {
     var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+    return function(text) {
+        if (!text) return '';
+        div.textContent = text;
+        return div.innerHTML;
+    };
+})();
 
 function mostrarError(mensaje) {
     var container = document.getElementById('blocks-list');
@@ -858,16 +878,18 @@ function mostrarError(mensaje) {
 }
 
 function getMockDevelopments() {
-    return [
+    return assignDevIds([
         { nombre: "Carrusel de Videos en Home", resumen: "Muestra videos de productos destacados en Home", descripcion: "Solucion que permite mostrar productos destacados de forma dinamica.", captura_url: "https://via.placeholder.com/300x150", link: "#" },
         { nombre: "Cross Selling en Checkout", resumen: "Maximiza el valor de cada compra", descripcion: "Presenta productos complementarios justo antes del checkout.", captura_url: "https://via.placeholder.com/300x150", link: "#" },
         { nombre: "Compra Conjunta en PDP", resumen: "Sugiere productos complementarios en PDP", descripcion: "Muestra productos complementarios como oferta de combo.", captura_url: "https://via.placeholder.com/300x150", link: "#" }
-    ];
+    ]);
 }
 
 function getTimeAgo(dateStr) {
+    if (!dateStr) return '-';
     var now = new Date();
     var date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '-';
     var diffMs = now - date;
     var diffMins = Math.floor(diffMs / 60000);
     var diffHours = Math.floor(diffMs / 3600000);
@@ -888,12 +910,10 @@ var ROUTE_MAP = {
     'clients': 'clientes'
 };
 
-var ROUTE_REVERSE = {
-    'componer': 'composer',
-    'enviados': 'history',
-    'analytics': 'analytics',
-    'clientes': 'clients'
-};
+var ROUTE_REVERSE = {};
+for (var key in ROUTE_MAP) {
+    ROUTE_REVERSE[ROUTE_MAP[key]] = key;
+}
 
 function getRouteFromNav(navName) {
     return ROUTE_MAP[navName] || navName;
@@ -928,8 +948,8 @@ function switchTab(navName, updateHash) {
 
 function handleRouteChange() {
     var hash = window.location.hash || '#/componer';
-    var route = hash.replace('#/', '');
-    var navName = getNavFromRoute(route);
+    var route = hash.replace('#/', '') || 'componer';
+    var navName = getNavFromRoute(route) || 'composer';
     switchTab(navName, false);
 }
 
@@ -996,7 +1016,7 @@ function renderClientsPage() {
     allClients.forEach(function(c) {
         var statusText = c.status === 'engaged' ? 'Comprometido' : c.status === 'active' ? 'Activo' : c.status === 'cold' ? 'Sin abrir' : 'Sin actividad';
         var statusIcon = c.status === 'engaged' ? 'fa-fire' : c.status === 'active' ? 'fa-check-circle' : c.status === 'cold' ? 'fa-clock' : 'fa-minus-circle';
-        html += '<div class="client-card" onclick="showClientProfile(\'' + c.email.replace(/'/g, "\\'") + '\')">';
+        html += '<div class="client-card" data-client-email="' + escapeHtml(c.email) + '">';
         html += '<div class="client-card-header">';
         html += '<div class="client-card-avatar">' + c.initials + '</div>';
         html += '<div class="client-card-info">';
@@ -1014,6 +1034,12 @@ function renderClientsPage() {
         html += '</div>';
     });
     grid.innerHTML = html;
+    grid.querySelectorAll('.client-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            var email = this.getAttribute('data-client-email');
+            if (email) showClientProfile(email);
+        });
+    });
 }
 
 // ============================================
@@ -1085,6 +1111,8 @@ async function showClientProfile(clientEmail) {
     var title = document.getElementById('modal-client-title');
     var body = document.getElementById('modal-client-body');
     title.textContent = client.nombre;
+    body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando perfil...</div>';
+    modal.style.display = 'flex';
 
     // Forzar actualizacion de datos desde Sheet antes de mostrar
     try {
@@ -1413,8 +1441,12 @@ async function pollTrackingEvents() {
             }
             if (hasChanges) {
                 saveSends(updatedSends);
-                renderHistory();
-                renderAnalytics();
+                var activeView = document.querySelector('.view-content.active');
+                if (activeView) {
+                    var viewId = activeView.id;
+                    if (viewId === 'view-history') renderHistory();
+                    if (viewId === 'view-analytics') renderAnalytics();
+                }
                 console.log('Tracking actualizado desde Sheets');
             }
         }
@@ -1457,7 +1489,7 @@ async function init() {
     var searchDevInput = document.getElementById('search-developments');
     if (searchDevInput) searchDevInput.addEventListener('input', function(e) { devSearchTerm = e.target.value; renderSidebar(); });
     var searchClientInput = document.getElementById('search-clients');
-    if (searchClientInput) searchClientInput.addEventListener('input', function(e) { clientSearchTerm = e.target.value; renderClientSelector(); });
+    if (searchClientInput) searchClientInput.addEventListener('input', function(e) { clientSearchTerm = e.target.value; clientsPageLoaded = CLIENTS_PAGE_SIZE; renderClientSelector(); });
 
     // Nav items
     document.querySelectorAll('.nav-item').forEach(function(btn) { btn.addEventListener('click', function() { navigateTo(this.getAttribute('data-nav')); }); });
@@ -1501,7 +1533,10 @@ async function init() {
     // Inicializar ruta segun la URL
     handleRouteChange();
 
-    setInterval(function() { pollTrackingEvents(); }, POLL_INTERVAL);
+    var pollIntervalId = setInterval(function() { pollTrackingEvents(); }, POLL_INTERVAL);
+    window.addEventListener('beforeunload', function() {
+        if (pollIntervalId) clearInterval(pollIntervalId);
+    });
 
     console.log('Kudos Mail CRM inicializado');
 }

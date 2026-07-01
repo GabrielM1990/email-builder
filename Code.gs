@@ -2,6 +2,7 @@
 // KUDOS MAIL CRM - Google Apps Script
 // ============================================
 // Hojas necesarias en el Spreadsheet:
+//   - "Desarrollos" (desarrollos disponibles)
 //   - "Envios" (envíos realizados)
 //   - "Tracking" (eventos de apertura/click)
 //   - "Clientes" (datos de clientes)
@@ -9,13 +10,55 @@
 
 // IMPORTANTE: Reemplazar con el ID de tu Google Spreadsheet
 // Lo encuentras en la URL: https://docs.google.com/spreadsheets/d/ESTE_ES_EL_ID/edit
-var SPREADSHEET_ID = 'REEMPLAZAR_CON_TU_SPREADSHEET_ID';
+var SPREADSHEET_ID = '1yB8SensY8uwXPrs61jQ9r1RngC1XGCpeLLa5Lkj23PI';
+var SHEET_DESARROLLOS = 'Desarrollos';
 var SHEET_ENVIOS = 'Envios';
 var SHEET_TRACKING = 'Tracking';
+var SHEET_CLIENTES = 'Clientes';
+
+// API Key simple para autenticacion
+// IMPORTANTE: Cambiar por un valor seguro antes de deployar
+var API_KEY = 'kudos_key_8fH3mK9wPq';
+
+// Validar autenticacion
+function requireAuth(e) {
+  var providedKey = '';
+  if (e && e.parameter && e.parameter.apiKey) {
+    providedKey = e.parameter.apiKey;
+  }
+  if (e && e.postData && e.postData.contents) {
+    try {
+      var data = JSON.parse(e.postData.contents);
+      if (data.apiKey) providedKey = data.apiKey;
+    } catch (err) {}
+  }
+  if (providedKey !== API_KEY) {
+    throw new Error('No autorizado. Proporcione una apiKey valida.');
+  }
+}
+
+function validateSpreadsheetId() {
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'REEMPLAZAR_CON_TU_SPREADSHEET_ID') {
+    throw new Error('SPREADSHEET_ID no configurado. Edita Code.gs y reemplazalo con el ID de tu Google Spreadsheet.');
+  }
+}
 
 // Obtener spreadsheet
 function getSpreadsheet() {
+  validateSpreadsheetId();
   return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+var ALLOWED_REDIRECT_DOMAINS = [];
+
+function isUrlAllowed(url) {
+  if (!url || url === '#') return true;
+  try {
+    var parsed = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false });
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // ============================================
@@ -23,8 +66,11 @@ function getSpreadsheet() {
 // ============================================
 function doPost(e) {
   try {
+    requireAuth(e);
     var data = JSON.parse(e.postData.contents);
-    var action = data.action || 'sendEmail';
+    var action = data.action || '';
+
+    validateInput(data);
 
     switch (action) {
       case 'sendEmail':
@@ -36,12 +82,40 @@ function doPost(e) {
       case 'logClick':
         return logTrackingEvent('click', data);
       default:
-        return sendEmailAndLog(data);
+        return jsonResponse({ success: false, error: 'Accion no valida: ' + action }, '');
     }
   } catch (error) {
     return ContentService
       .createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function validateInput(data) {
+  if (data.action === 'sendEmail') {
+    if (data.recipients && data.recipients.length > 0) {
+      if (data.recipients.length > 200) {
+        throw new Error('No se pueden enviar mas de 200 emails por lote.');
+      }
+      for (var i = 0; i < data.recipients.length; i++) {
+        if (!data.recipients[i].email || !data.recipients[i].email.includes('@')) {
+          throw new Error('Email invalido en recipient ' + (i + 1) + ': ' + data.recipients[i].email);
+        }
+        if (data.recipients[i].htmlContent && data.recipients[i].htmlContent.length > 200000) {
+          throw new Error('El contenido HTML del recipient ' + (i + 1) + ' excede el limite de 200KB.');
+        }
+      }
+    } else if (data.to) {
+      if (!data.to.includes('@')) {
+        throw new Error('Email invalido: ' + data.to);
+      }
+      if (data.htmlContent && data.htmlContent.length > 200000) {
+        throw new Error('El contenido HTML excede el limite de 200KB.');
+      }
+    }
+    if (data.subject && data.subject.length > 500) {
+      throw new Error('El asunto excede el limite de 500 caracteres.');
+    }
   }
 }
 
@@ -61,13 +135,32 @@ function jsonResponse(data, callback) {
 function doGet(e) {
   try {
     var action = e.parameter.action || '';
+
+    // Tracking pixel y redirect NO requieren auth (son para clientes externos)
+    if (action === 'open') {
+      return handleTrackingPixel(e);
+    }
+    if (action === 'click') {
+      return handleClickRedirect(e);
+    }
+
+    // El resto de las acciones requieren autenticacion
+    requireAuth(e);
     var callback = e.parameter.callback || '';
 
     switch (action) {
-      case 'open':
-        return handleTrackingPixel(e);
-      case 'click':
-        return handleClickRedirect(e);
+      case 'sendEmail':
+        return handleSendViaGet(e, callback);
+      case 'logSend':
+        return handleLogSendViaGet(e, callback);
+      case 'logOpen':
+        return logTrackingEventViaGet('open', e, callback);
+      case 'logClick':
+        return logTrackingEventViaGet('click', e, callback);
+      case 'getDevelopments':
+        return getDevelopmentsData(e, callback);
+      case 'getClients':
+        return getClientsData(e, callback);
       case 'getSends':
         return getSendsData(e, callback);
       case 'getTracking':
@@ -80,23 +173,61 @@ function doGet(e) {
   }
 }
 
+function handleSendViaGet(e, callback) {
+  return jsonResponse({ success: false, error: 'sendEmail debe usar POST' }, callback);
+}
+
+function handleLogSendViaGet(e, callback) {
+  return jsonResponse({ success: false, error: 'logSend debe usar POST' }, callback);
+}
+
+function logTrackingEventViaGet(type, e, callback) {
+  var data = {
+    sendId: e.parameter.sendId || '',
+    trackingId: e.parameter.trackingId || '',
+    timestamp: new Date().toISOString(),
+    url: e.parameter.url || '',
+    blockName: e.parameter.blockName || ''
+  };
+  try {
+    logTrackingEvent(type, data);
+    return jsonResponse({ success: true }, callback);
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.toString() }, callback);
+  }
+}
+
 // ============================================
 // ENVIAR EMAIL Y REGISTRAR ENVIO
 // ============================================
+var EMAIL_BATCH_SIZE = 20;
+var EMAIL_BATCH_PAUSE = 5000;
+
 function sendEmailAndLog(data) {
   var results = [];
+  var startTime = Date.now();
+  var MAX_EXECUTION_MS = 300000; // 5 minutos de margen sobre el limite de 6min
 
   // Si hay recipients (envío masivo)
   if (data.recipients && data.recipients.length > 0) {
-    for (var i = 0; i < data.recipients.length; i++) {
-      var recipient = data.recipients[i];
+    var recipients = data.recipients;
+
+    for (var i = 0; i < recipients.length; i++) {
+      // Verificar tiempo restante antes de cada envio
+      if (Date.now() - startTime > MAX_EXECUTION_MS) {
+        for (var k = i; k < recipients.length; k++) {
+          results.push({ email: recipients[k].email, status: 'pending', error: 'Limite de tiempo excedido' });
+        }
+        break;
+      }
+
+      var recipient = recipients[i];
       try {
         GmailApp.sendEmail(recipient.email, data.subject, '', {
           htmlBody: recipient.htmlContent,
           name: 'Kudos Commerce'
         });
 
-        // Registrar en hoja Envios
         logSendToSheet({
           sendId: data.sendId,
           sendDate: data.sendDate,
@@ -126,8 +257,10 @@ function sendEmailAndLog(data) {
         results.push({ email: recipient.email, status: 'bounced', error: error.toString() });
       }
 
-      // Pausa entre envíos para evitar límites
-      if (i < data.recipients.length - 1) {
+      // Pausa cada batch para evitar limites de rate
+      if (i > 0 && i % EMAIL_BATCH_SIZE === 0 && i < recipients.length - 1) {
+        Utilities.sleep(EMAIL_BATCH_PAUSE);
+      } else if (i < recipients.length - 1) {
         Utilities.sleep(2000);
       }
     }
@@ -255,18 +388,30 @@ function handleTrackingPixel(e) {
     }
   }
 
-  // Devolver respuesta minima tipo imagen
-  // Los proxies de email (Gmail, Outlook) hacen la petición GET al servidor
-  // Lo importante es que la petición LLEGA y se registra el evento en la hoja
-  // No necesitamos devolver una imagen real, solo una respuesta HTTP 200
-  var output = ContentService.createTextOutput('');
-  output.setMimeType(ContentService.MimeType.TEXT);
-  return output;
+  // Devolver un pixel transparente 1x1 GIF real
+  // Algunos clientes de email rechazan respuestas vacias pero aceptan imagenes
+  var gifBase64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  var gifBlob = Utilities.newBlob(Utilities.base64Decode(gifBase64), 'image/gif');
+  return ContentService.createTextOutput(gifBlob.getDataAsString())
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 // ============================================
 // TRACKING: REDIRECCIÓN DE CLICK
 // ============================================
+function isUrlSafe(url) {
+  if (!url) return true;
+  try {
+    var parsed = UrlFetchApp.getRequest(url);
+    var protocol = url.toLowerCase().substring(0, 8);
+    if (protocol.indexOf('http') !== 0) return false;
+    if (url.length > 2000) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function handleClickRedirect(e) {
   var sendId = e.parameter.sendId || '';
   var trkId = e.parameter.trkId || '';
@@ -287,14 +432,24 @@ function handleClickRedirect(e) {
     }
   }
 
-  // Redirigir a la URL original con meta refresh + JS
-  if (url) {
+  // Validar URL contra lista blanca de dominios y esquemas
+  if (url && isUrlSafe(url)) {
+    var safeUrl = url.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return HtmlService.createHtmlOutput(
       '<!DOCTYPE html><html><head>' +
-      '<meta http-equiv="refresh" content="0;url=' + url + '">' +
+      '<meta http-equiv="refresh" content="0;url=' + safeUrl + '">' +
       '</head><body>' +
       '<p>Redirigiendo...</p>' +
-      '<script>window.location.href="' + url + '";</script>' +
+      '<script>window.location.href=' + JSON.stringify(url) + ';</script>' +
+      '</body></html>'
+    );
+  }
+
+  // Si la URL no es segura, mostrar pagina de advertencia
+  if (url && !isUrlSafe(url)) {
+    return HtmlService.createHtmlOutput(
+      '<!DOCTYPE html><html><head><title>Enlace no seguro</title></head><body>' +
+      '<p>El enlace solicitado no pudo ser verificado como seguro.</p>' +
       '</body></html>'
     );
   }
@@ -336,38 +491,50 @@ function logTrackingEvent(type, data) {
 // ACTUALIZAR CONTADORES EN HOJA ENVIOS
 // ============================================
 function updateSendTracking(trackingId, eventType) {
-  var ss = getSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_ENVIOS);
-  if (!sheet) return;
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    console.log('No se pudo adquirir lock para tracking:', e);
+    return;
+  }
 
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0];
+  try {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_ENVIOS);
+    if (!sheet) return;
 
-  var colTrackingId = headers.indexOf('trackingId');
-  var colStatus = headers.indexOf('status');
-  var colOpenCount = headers.indexOf('openCount');
-  var colClickCount = headers.indexOf('clickCount');
-  var colLastEvent = headers.indexOf('lastEvent');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
 
-  if (colTrackingId === -1) return;
+    var colTrackingId = headers.indexOf('trackingId');
+    var colStatus = headers.indexOf('status');
+    var colOpenCount = headers.indexOf('openCount');
+    var colClickCount = headers.indexOf('clickCount');
+    var colLastEvent = headers.indexOf('lastEvent');
 
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][colTrackingId] === trackingId) {
-      var row = i + 1;
+    if (colTrackingId === -1) return;
 
-      if (eventType === 'open') {
-        var openCount = parseInt(data[i][colOpenCount]) || 0;
-        sheet.getRange(row, colOpenCount + 1).setValue(openCount + 1);
-        sheet.getRange(row, colStatus + 1).setValue('opened');
-      } else if (eventType === 'click') {
-        var clickCount = parseInt(data[i][colClickCount]) || 0;
-        sheet.getRange(row, colClickCount + 1).setValue(clickCount + 1);
-        sheet.getRange(row, colStatus + 1).setValue('clicked');
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colTrackingId] === trackingId) {
+        var row = i + 1;
+
+        if (eventType === 'open') {
+          var openCount = parseInt(data[i][colOpenCount]) || 0;
+          sheet.getRange(row, colOpenCount + 1).setValue(openCount + 1);
+          sheet.getRange(row, colStatus + 1).setValue('opened');
+        } else if (eventType === 'click') {
+          var clickCount = parseInt(data[i][colClickCount]) || 0;
+          sheet.getRange(row, colClickCount + 1).setValue(clickCount + 1);
+          sheet.getRange(row, colStatus + 1).setValue('clicked');
+        }
+
+        sheet.getRange(row, colLastEvent + 1).setValue(new Date().toISOString());
+        break;
       }
-
-      sheet.getRange(row, colLastEvent + 1).setValue(new Date().toISOString());
-      break;
     }
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -401,12 +568,21 @@ function getSendsData(e, callback) {
   for (var i = 1; i < data.length; i++) {
     var sendId = data[i][colSendId];
 
+    var blocks = [];
+    if (data[i][colBlocks]) {
+      try {
+        blocks = JSON.parse(data[i][colBlocks]);
+      } catch (e) {
+        blocks = [];
+      }
+    }
+
     if (!sends[sendId]) {
       sends[sendId] = {
         id: sendId,
         date: data[i][colSendDate],
         subject: data[i][colSubject],
-        blocks: data[i][colBlocks] ? JSON.parse(data[i][colBlocks]) : [],
+        blocks: blocks,
         totalRecipients: 0,
         recipients: []
       };
@@ -510,12 +686,12 @@ function generateId() {
   return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-// Función de prueba
+// Función de prueba - actualizar con un email real antes de usar
 function testSend() {
-  GmailApp.sendEmail('tuemail@empresa.com', 'Prueba Kudos CRM', 'Mensaje de prueba', {
-    htmlBody: '<h1>Hola</h1><p>Esto es una prueba del CRM</p>',
-    name: 'Kudos Commerce'
-  });
+  // GmailApp.sendEmail('tuemail@empresa.com', 'Prueba Kudos CRM', 'Mensaje de prueba', {
+  //   htmlBody: '<h1>Hola</h1><p>Esto es una prueba del CRM</p>',
+  //   name: 'Kudos Commerce'
+  // });
 }
 
 // ============================================
@@ -603,4 +779,82 @@ function migrateTrackingSheet() {
   headerRange.setFontWeight('bold').setBackground('#764ba2').setFontColor('#ffffff');
   
   return 'Columna blockName agregada a la hoja Tracking. Total columnas: ' + (lastCol + 1);
+}
+
+// ============================================
+// OBTENER DATOS DE DESARROLLOS (GET)
+// ============================================
+function getDevelopmentsData(e, callback) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_DESARROLLOS);
+  if (!sheet) {
+    return jsonResponse({ success: true, developments: [] }, callback);
+  }
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    return jsonResponse({ success: true, developments: [] }, callback);
+  }
+
+  var headers = data[0].map(function(h) { return h.toString().toLowerCase().replace(/^\uFEFF/, ''); });
+  var nombreIndex = headers.indexOf('nombre') !== -1 ? headers.indexOf('nombre') : headers.indexOf('name');
+  var resumenIndex = headers.indexOf('resumen') !== -1 ? headers.indexOf('resumen') : (headers.indexOf('summary') !== -1 ? headers.indexOf('summary') : -1);
+  var descripcionIndex = headers.indexOf('descripcion') !== -1 ? headers.indexOf('descripcion') : (headers.indexOf('description') !== -1 ? headers.indexOf('description') : -1);
+  var capturaIndex = headers.indexOf('captura_url') !== -1 ? headers.indexOf('captura_url') : (headers.indexOf('captura') !== -1 ? headers.indexOf('captura') : (headers.indexOf('image') !== -1 ? headers.indexOf('image') : -1));
+  var linkIndex = headers.indexOf('link') !== -1 ? headers.indexOf('link') : (headers.indexOf('url') !== -1 ? headers.indexOf('url') : -1);
+
+  var developments = [];
+  for (var i = 1; i < data.length; i++) {
+    var nombre = nombreIndex >= 0 ? data[i][nombreIndex].toString().trim() : '';
+    if (!nombre) continue;
+
+    // La columna captura_url en el sheet contiene el link a la presentacion, no una imagen
+    var sheetLink = capturaIndex >= 0 ? data[i][capturaIndex].toString().trim() : '';
+    var actualLink = linkIndex >= 0 ? data[i][linkIndex].toString().trim() : (sheetLink || '#');
+
+    developments.push({
+      id: 'dev_' + i + '_' + Date.now(),
+      nombre: nombre,
+      resumen: resumenIndex >= 0 ? data[i][resumenIndex].toString().trim() : '',
+      descripcion: descripcionIndex >= 0 ? data[i][descripcionIndex].toString().trim() : '',
+      captura_url: 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(nombre.substring(0, 30)),
+      link: actualLink
+    });
+  }
+
+  return jsonResponse({ success: true, developments: developments }, callback);
+}
+
+// ============================================
+// OBTENER DATOS DE CLIENTES (GET)
+// ============================================
+function getClientsData(e, callback) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_CLIENTES);
+  if (!sheet) {
+    return jsonResponse({ success: true, clients: [] }, callback);
+  }
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    return jsonResponse({ success: true, clients: [] }, callback);
+  }
+
+  var headers = data[0].map(function(h) { return h.toString().toLowerCase().replace(/^\uFEFF/, ''); });
+  var nombreIndex = headers.indexOf('nombre') !== -1 ? headers.indexOf('nombre') : (headers.indexOf('name') !== -1 ? headers.indexOf('name') : (headers.indexOf('cliente') !== -1 ? headers.indexOf('cliente') : -1));
+  var emailIndex = headers.indexOf('email') !== -1 ? headers.indexOf('email') : (headers.indexOf('correo') !== -1 ? headers.indexOf('correo') : (headers.indexOf('mail') !== -1 ? headers.indexOf('mail') : -1));
+  var empresaIndex = headers.indexOf('empresa') !== -1 ? headers.indexOf('empresa') : (headers.indexOf('company') !== -1 ? headers.indexOf('company') : -1);
+
+  var clients = [];
+  for (var i = 1; i < data.length; i++) {
+    var email = emailIndex >= 0 ? data[i][emailIndex].toString().trim() : '';
+    if (!email || email.indexOf('@') === -1) continue;
+    clients.push({
+      nombre: nombreIndex >= 0 ? data[i][nombreIndex].toString().trim() : email.split('@')[0],
+      email: email,
+      empresa: empresaIndex >= 0 ? data[i][empresaIndex].toString().trim() : 'Cliente'
+    });
+  }
+
+  return jsonResponse({ success: true, clients: clients }, callback);
 }
