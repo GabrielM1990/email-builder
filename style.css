@@ -2023,14 +2023,20 @@ body {
 .seg-dev-badge {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 10px;
     background: #e8f0fe;
     color: #1a73e8;
-    font-size: 12px;
+    font-size: 10px;
+    font-weight: 500;
     cursor: default;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.seg-dev-badge i {
+    font-size: 9px;
 }
 
 .seg-dev-badge.implemented {

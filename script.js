@@ -697,8 +697,8 @@ function getDevSeguimientoBadge(dev) {
         return '<span class="seg-dev-badge" style="background:#e6f4ea;color:#137333;" title="Implementado en todas las tiendas"><i class="fas fa-check-circle"></i> Implementado</span>';
     }
     // Show mixed
-    var labels = entries.map(function(e) { var c = statusColors[e[1]] || {}; return (c.icon ? '<i class="fas ' + c.icon + '" style="font-size:9px;"></i>' : '') + ' ' + (statusLabels[e[1]] || e[1]); }).join(' | ');
-    return '<span class="seg-dev-badge" style="background:#f1f3f4;color:#5f6368;font-size:10px;" title="' + escapeHtml(entries.map(function(e) { return e[0] + ': ' + e[1]; }).join(', ')) + '">' + labels + '</span>';
+    var labels = entries.map(function(e) { var c = statusColors[e[1]] || {}; return (c.icon ? '<i class="fas ' + c.icon + '"></i>' : '') + ' ' + (statusLabels[e[1]] || e[1]); }).join(' | ');
+    return '<span class="seg-dev-badge" style="background:#f1f3f4;color:#5f6368;" title="' + escapeHtml(entries.map(function(e) { return e[0] + ': ' + e[1]; }).join(', ')) + '">' + labels + '</span>';
 }
 
 // ============================================
