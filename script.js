@@ -48,7 +48,7 @@ function addSend(sendData) {
 function fetchFromSheet(action) {
     return new Promise(function(resolve) {
         var callbackName = 'kudosCallback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-        var url = APPS_SCRIPT_URL + '?action=' + action + '&callback=' + callbackName + '&t=' + Date.now();
+        var url = APPS_SCRIPT_URL + '?action=' + action + '&callback=' + callbackName + '&t=' + Date.now() + '&apiKey=' + encodeURIComponent(API_KEY);
         
         window[callbackName] = function(data) {
             delete window[callbackName];
