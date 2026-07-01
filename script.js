@@ -988,6 +988,61 @@ async function loadMasterData() {
     }
 }
 
+function renderSeguimientoDashboard() {
+    var el = document.getElementById('seg-dashboard');
+    if (!el) return;
+    var tiendas = masterData.tiendas;
+    var desarrollos = masterData.desarrollos;
+    if (!tiendas.length || !desarrollos.length) { el.innerHTML = ''; return; }
+
+    var statusLabels = {
+        'Implementado': 'Implementados',
+        'En curso': 'En curso',
+        'Propuesto': 'Propuestos',
+        'Proponer': 'Proponer',
+        'No aplica': 'No aplica'
+    };
+    var statusColors = {
+        'Implementado': '#137333',
+        'En curso': '#1a73e8',
+        'Propuesto': '#b06000',
+        'Proponer': '#5f6368',
+        'No aplica': '#dc3545'
+    };
+    var totalDevs = desarrollos.length;
+
+    var html = '<div class="seg-dashboard-grid">';
+    tiendas.forEach(function(tienda) {
+        var counts = {};
+        var totalWithStatus = 0;
+        desarrollos.forEach(function(d) {
+            var st = d.estados[tienda] || '';
+            if (st) {
+                counts[st] = (counts[st] || 0) + 1;
+                totalWithStatus++;
+            }
+        });
+        var implemented = counts['Implementado'] || 0;
+        var pct = totalDevs ? Math.round((implemented / totalDevs) * 100) : 0;
+        var barColor = pct >= 75 ? '#137333' : pct >= 50 ? '#b06000' : pct >= 25 ? '#e37400' : '#dc3545';
+
+        html += '<div class="seg-dash-card">';
+        html += '<div class="seg-dash-card-header">' + escapeHtml(tienda) + '</div>';
+        html += '<div class="seg-dash-stat"><span class="seg-dash-num">' + implemented + '</span><span class="seg-dash-label">/' + totalDevs + ' impl.</span></div>';
+        html += '<div class="seg-dash-bar"><div class="seg-dash-bar-fill" style="width:' + pct + '%;background:' + barColor + ';"></div></div>';
+        html += '<div class="seg-dash-tags">';
+        Object.keys(statusLabels).forEach(function(st) {
+            var c = counts[st] || 0;
+            if (c > 0) {
+                html += '<span class="seg-dash-tag" style="color:' + (statusColors[st] || '#5f6368') + ';">' + c + ' ' + statusLabels[st] + '</span>';
+            }
+        });
+        html += '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
 function renderSeguimiento() {
     var wrapper = document.getElementById('seg-table-wrapper');
     if (!wrapper) return;
@@ -1002,6 +1057,8 @@ function renderSeguimiento() {
 
     var tiendas = masterData.tiendas;
     var desarrollos = masterData.desarrollos;
+
+    renderSeguimientoDashboard();
 
     if (desarrollos.length === 0) {
         wrapper.innerHTML = '<div class="empty-state"><i class="fas fa-table empty-icon"></i><p>No hay datos de seguimiento</p><small>Carga los datos desde el sheet</small></div>';
