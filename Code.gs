@@ -17,6 +17,10 @@ var SHEET_ENVIOS = 'Envios';
 var SHEET_TRACKING = 'Tracking';
 var SHEET_CLIENTES = 'Clientes';
 
+// Spreadsheet de Seguimiento (separado del principal)
+var SEGUIMIENTO_SPREADSHEET_ID = '1WISybdPVUzhYwSUek2nnTxC--aI8WYsF60DrG-wjQX4';
+var SEGUIMIENTO_SHEET = 'Seguimiento Gestion / Comercial';
+
 // API Key simple para autenticacion
 // IMPORTANTE: Cambiar por un valor seguro antes de deployar
 var API_KEY = 'kudos_key_8fH3mK9wPq';
@@ -158,6 +162,8 @@ function doGet(e) {
         return logTrackingEventViaGet('open', e, callback);
       case 'logClick':
         return logTrackingEventViaGet('click', e, callback);
+      case 'getMasterData':
+        return getMasterData(e, callback);
       case 'getDevelopments':
         return getDevelopmentsData(e, callback);
       case 'getClients':
@@ -891,4 +897,59 @@ function getClientsData(e, callback) {
   }
 
   return jsonResponse({ success: true, clients: clients }, callback);
+}
+
+// ============================================
+// OBTENER DATOS DEL MASTER DE PRODUCTOS (GET)
+// ============================================
+function getMasterData(e, callback) {
+  try {
+    var ss = SpreadsheetApp.openById(SEGUIMIENTO_SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SEGUIMIENTO_SHEET);
+    if (!sheet) {
+      return jsonResponse({ success: false, error: 'Hoja no encontrada: ' + SEGUIMIENTO_SHEET }, callback);
+    }
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 9) {
+      return jsonResponse({ success: true, tiendas: [], desarrollos: [] }, callback);
+    }
+
+    // Row 6 (0-indexed) = headers: Codigo (col B), Titulo (col C), tiendas desde col D
+    // Row 7 (0-indexed) = headers con Codigo(col B), Titulo(col C), tiendas desde col D
+    var headerRow = data[7];
+    var tiendas = [];
+    for (var c = 3; c < headerRow.length; c++) {
+      var nombre = headerRow[c].toString().trim();
+      if (nombre) tiendas.push(nombre);
+    }
+
+    // Row 7 (0-indexed) = PM names (sub-header, lo ignoramos pero podria usarse)
+
+    // Data rows desde row 8 (0-indexed)
+    var desarrollos = [];
+    for (var r = 8; r < data.length; r++) {
+      var codigo = (data[r][1] || '').toString().trim();
+      var titulo = (data[r][2] || '').toString().trim();
+      if (!codigo && !titulo) continue;
+
+      var estados = {};
+      for (var tc = 0; tc < tiendas.length; tc++) {
+        var col = tc + 3;
+        var estado = col < data[r].length ? (data[r][col] || '').toString().trim() : '';
+        if (estado) estados[tiendas[tc]] = estado;
+      }
+
+      desarrollos.push({
+        codigo: codigo,
+        titulo: titulo,
+        nombre: (codigo ? codigo + ' - ' : '') + titulo,
+        estados: estados
+      });
+    }
+
+    return jsonResponse({ success: true, tiendas: tiendas, desarrollos: desarrollos }, callback);
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.toString() }, callback);
+  }
 }
