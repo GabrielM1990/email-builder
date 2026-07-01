@@ -1803,6 +1803,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
+    table-layout: fixed;
 }
 
 .seg-table th {
@@ -1826,29 +1827,32 @@ body {
 }
 
 .seg-th-code {
-    min-width: 80px;
-}
-
-.seg-th-title {
-    min-width: 200px;
-}
-
-.seg-th-store {
-    min-width: 120px;
-    text-align: center;
+    width: 80px;
 }
 
 .seg-td-code {
+    width: 80px;
     font-family: monospace;
     font-weight: 600;
     color: #1a73e8;
 }
 
+.seg-th-title {
+    width: auto;
+}
+
 .seg-td-title {
+    width: auto;
     color: #2c3e50;
 }
 
+.seg-th-store {
+    width: 130px;
+    text-align: center;
+}
+
 .seg-td-status {
+    width: 130px;
     text-align: center;
 }
 
