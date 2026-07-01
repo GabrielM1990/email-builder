@@ -1947,6 +1947,64 @@ body {
     font-size: 10px;
 }
 
+/* Seguimiento Store Detail Modal */
+.seg-modal-summary {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 16px;
+}
+
+.seg-modal-group {
+    margin-bottom: 16px;
+}
+
+.seg-modal-group-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.seg-modal-group-title i {
+    font-size: 14px;
+}
+
+.seg-modal-count {
+    font-weight: 400;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.seg-modal-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.seg-modal-item {
+    padding: 6px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.seg-modal-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: #1a73e8;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.seg-modal-name {
+    color: #2c3e50;
+}
+
 /* Seguimiento badge in composer dev cards */
 .block-header {
     display: flex;

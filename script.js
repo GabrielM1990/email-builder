@@ -1055,16 +1055,80 @@ function renderSeguimientoDashboard() {
             renderSeguimiento();
         });
     });
+    el.querySelectorAll('.seg-dash-card').forEach(function(card) {
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.seg-dash-tag') || e.target.closest('.seg-dash-card-header')) return;
+            var store = this.querySelector('.seg-dash-card-header').getAttribute('data-store');
+            if (store) showStoreDetail(store);
+        });
+    });
     el.querySelectorAll('.seg-dash-card-header').forEach(function(hdr) {
         hdr.addEventListener('click', function() {
             var store = this.getAttribute('data-store');
-            var storeSelect = document.getElementById('seg-filter-store');
-            if (storeSelect) storeSelect.value = store;
-            var statusSelect = document.getElementById('seg-filter-status');
-            if (statusSelect) statusSelect.value = '';
-            renderSeguimiento();
+            if (store) showStoreDetail(store);
         });
     });
+}
+
+function showStoreDetail(store) {
+    var modal = document.getElementById('store-detail-modal');
+    var body = document.getElementById('modal-store-body');
+    var title = document.getElementById('modal-store-title');
+    if (!modal || !body) return;
+
+    title.textContent = 'Tienda: ' + store;
+
+    var statusOrder = ['Implementado', 'En curso', 'Propuesto', 'Proponer', 'No aplica'];
+    var statusColors = {
+        'Implementado': { bg: '#e6f4ea', text: '#137333', icon: 'fa-check-circle' },
+        'En curso': { bg: '#e8f0fe', text: '#1a73e8', icon: 'fa-spinner' },
+        'Propuesto': { bg: '#fef7e0', text: '#b06000', icon: 'fa-clock' },
+        'Proponer': { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-lightbulb' },
+        'No aplica': { bg: '#fce8e6', text: '#dc3545', icon: 'fa-ban' }
+    };
+
+    var grouped = {};
+    var totalEnStore = 0;
+    masterData.desarrollos.forEach(function(d) {
+        var st = d.estados[store] || '';
+        if (!st) st = 'Sin estado';
+        if (!grouped[st]) grouped[st] = [];
+        grouped[st].push(d);
+        totalEnStore++;
+    });
+
+    var html = '<p class="seg-modal-summary">Total: <strong>' + totalEnStore + '</strong> desarrollos</p>';
+    statusOrder.forEach(function(st) {
+        var items = grouped[st];
+        if (!items || !items.length) return;
+        var color = statusColors[st] || { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-minus' };
+        html += '<div class="seg-modal-group">';
+        html += '<h3 class="seg-modal-group-title" style="color:' + color.text + ';"><i class="fas ' + color.icon + '"></i> ' + st + ' <span class="seg-modal-count">(' + items.length + ')</span></h3>';
+        html += '<div class="seg-modal-items">';
+        items.forEach(function(d) {
+            html += '<div class="seg-modal-item"><span class="seg-modal-code">' + escapeHtml(d.codigo) + '</span> <span class="seg-modal-name">' + escapeHtml(d.titulo) + '</span></div>';
+        });
+        html += '</div></div>';
+    });
+
+    // Any statuses not in the predefined order
+    Object.keys(grouped).forEach(function(st) {
+        if (statusOrder.indexOf(st) !== -1 || st === 'Sin estado') return;
+        var items = grouped[st];
+        html += '<div class="seg-modal-group"><h3 class="seg-modal-group-title">' + escapeHtml(st) + ' <span class="seg-modal-count">(' + items.length + ')</span></h3>';
+        html += '<div class="seg-modal-items">';
+        items.forEach(function(d) {
+            html += '<div class="seg-modal-item"><span class="seg-modal-code">' + escapeHtml(d.codigo) + '</span> <span class="seg-modal-name">' + escapeHtml(d.titulo) + '</span></div>';
+        });
+        html += '</div></div>';
+    });
+
+    if (!grouped['Sin estado']) {
+        // no-op, already handled
+    }
+
+    body.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
 function renderSeguimiento() {
@@ -1768,6 +1832,8 @@ async function init() {
     if (closeSendDetail) closeSendDetail.addEventListener('click', function() { document.getElementById('send-detail-modal').style.display = 'none'; });
     var closeClientProfile = document.getElementById('close-client-profile');
     if (closeClientProfile) closeClientProfile.addEventListener('click', function() { document.getElementById('client-profile-modal').style.display = 'none'; });
+    var closeStoreDetail = document.getElementById('close-store-detail');
+    if (closeStoreDetail) closeStoreDetail.addEventListener('click', function() { document.getElementById('store-detail-modal').style.display = 'none'; });
     document.querySelectorAll('.modal-overlay').forEach(function(overlay) { overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.style.display = 'none'; }); });
 
     var refreshHistoryBtn = document.getElementById('refresh-history');
