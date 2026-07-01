@@ -11,6 +11,7 @@
 // IMPORTANTE: Reemplazar con el ID de tu Google Spreadsheet
 // Lo encuentras en la URL: https://docs.google.com/spreadsheets/d/ESTE_ES_EL_ID/edit
 var SPREADSHEET_ID = '1yB8SensY8uwXPrs61jQ9r1RngC1XGCpeLLa5Lkj23PI';
+// IMPORTANTE: los nombres de las hojas deben coincidir exactamente con los de tu spreadsheet
 var SHEET_DESARROLLOS = 'Desarrollos';
 var SHEET_ENVIOS = 'Envios';
 var SHEET_TRACKING = 'Tracking';
