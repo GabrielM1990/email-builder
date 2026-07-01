@@ -991,9 +991,13 @@ async function loadMasterData() {
 function renderSeguimientoDashboard() {
     var el = document.getElementById('seg-dashboard');
     if (!el) return;
-    var tiendas = masterData.tiendas;
+    var allTiendas = masterData.tiendas;
     var desarrollos = masterData.desarrollos;
-    if (!tiendas.length || !desarrollos.length) { el.innerHTML = ''; return; }
+    if (!allTiendas.length || !desarrollos.length) { el.innerHTML = ''; return; }
+
+    var storeFilter = document.getElementById('seg-filter-store');
+    var selectedStore = storeFilter ? storeFilter.value : '';
+    var tiendas = selectedStore ? [selectedStore] : allTiendas;
 
     var statusLabels = {
         'Implementado': 'Implementados',
