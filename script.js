@@ -3,7 +3,7 @@
 // ============================================
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPUkdJc4XINr57b5Uxuohz6GJUTcIW59-2dDS4parofHVqZ67pz2ToHdZTPAlHSEb10A/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtdi9G80oTWiK2sdDDKrx_qauETrJwNnYrSuHXLAf-mo4DG13YoolAJE28tXe2siMwdQ/exec';
 var API_KEY = 'kudos_key_8fH3mK9wPq';
 
 var developments = [];
