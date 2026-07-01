@@ -903,13 +903,118 @@ function getTimeAgo(dateStr) {
 }
 
 // ============================================
+// SEGUIMIENTO - Matriz de desarrollos por tienda
+// ============================================
+var masterData = { tiendas: [], desarrollos: [] };
+
+async function loadMasterData() {
+    try {
+        var data = await fetchFromSheet('getMasterData');
+        if (data && data.success && data.desarrollos) {
+            masterData = { tiendas: data.tiendas || [], desarrollos: data.desarrollos || [] };
+        }
+    } catch (e) {
+        console.log('Error cargando master data:', e);
+    }
+}
+
+function renderSeguimiento() {
+    var wrapper = document.getElementById('seg-table-wrapper');
+    if (!wrapper) return;
+
+    var storeFilter = document.getElementById('seg-filter-store');
+    var statusFilter = document.getElementById('seg-filter-status');
+    var searchFilter = document.getElementById('seg-filter-search');
+
+    var storeVal = storeFilter ? storeFilter.value : '';
+    var statusVal = statusFilter ? statusFilter.value : '';
+    var searchVal = searchFilter ? searchFilter.value.toLowerCase() : '';
+
+    var tiendas = masterData.tiendas;
+    var desarrollos = masterData.desarrollos;
+
+    if (desarrollos.length === 0) {
+        wrapper.innerHTML = '<div class="empty-state"><i class="fas fa-table empty-icon"></i><p>No hay datos de seguimiento</p><small>Carga los datos desde el sheet</small></div>';
+        return;
+    }
+
+    // Filtrar desarrollos
+    var filtered = desarrollos;
+    if (searchVal) {
+        filtered = filtered.filter(function(d) {
+            return d.codigo.toLowerCase().indexOf(searchVal) !== -1 ||
+                   d.titulo.toLowerCase().indexOf(searchVal) !== -1;
+        });
+    }
+
+    // Determinar que tiendas mostrar
+    var visibleTiendas = tiendas;
+    if (storeVal) {
+        visibleTiendas = [storeVal];
+    }
+
+    var statusColors = {
+        'Implementado': { bg: '#e6f4ea', text: '#137333', icon: 'fa-check-circle' },
+        'En curso': { bg: '#e8f0fe', text: '#1a73e8', icon: 'fa-spinner' },
+        'Propuesto': { bg: '#fef7e0', text: '#b06000', icon: 'fa-clock' },
+        'Proponer': { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-lightbulb' },
+        'No aplica': { bg: '#fce8e6', text: '#dc3545', icon: 'fa-ban' }
+    };
+
+    var html = '<div class="seg-table-scroll"><table class="seg-table">';
+    html += '<thead><tr><th class="seg-th-code">Codigo</th><th class="seg-th-title">Desarrollo</th>';
+    visibleTiendas.forEach(function(t) {
+        html += '<th class="seg-th-store">' + escapeHtml(t) + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    filtered.forEach(function(d) {
+        html += '<tr><td class="seg-td-code">' + escapeHtml(d.codigo) + '</td>';
+        html += '<td class="seg-td-title">' + escapeHtml(d.titulo) + '</td>';
+        visibleTiendas.forEach(function(t) {
+            var estado = d.estados[t] || '';
+            var matchStatus = !statusVal || estado === statusVal;
+            var displayStyle = matchStatus ? '' : ' style="display:none;"';
+            var color = statusColors[estado] || { bg: '#f1f3f4', text: '#5f6368', icon: 'fa-minus' };
+            html += '<td class="seg-td-status"' + displayStyle + '>';
+            if (estado) {
+                html += '<span class="seg-badge" style="background:' + color.bg + ';color:' + color.text + ';"><i class="fas ' + color.icon + '"></i> ' + escapeHtml(estado) + '</span>';
+            }
+            html += '</td>';
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    wrapper.innerHTML = html;
+
+    var countEl = document.getElementById('seg-count');
+    if (countEl) countEl.textContent = filtered.length + ' desarrollos';
+}
+
+function updateTiendaFilter() {
+    var select = document.getElementById('seg-filter-store');
+    if (!select) return;
+    var currentVal = select.value;
+    select.innerHTML = '<option value="">Todas las tiendas</option>';
+    masterData.tiendas.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
+}
+
+// ============================================
 // ROUTER - Sistema de rutas con hash
 // ============================================
 var ROUTE_MAP = {
     'composer': 'componer',
     'history': 'enviados',
     'analytics': 'analytics',
-    'clients': 'clientes'
+    'clients': 'clientes',
+    'seguimiento': 'seguimiento'
 };
 
 var ROUTE_REVERSE = {};
@@ -939,6 +1044,7 @@ function switchTab(navName, updateHash) {
     if (navName === 'history') renderHistory();
     if (navName === 'analytics') renderAnalytics();
     if (navName === 'clients') renderClientsPage();
+    if (navName === 'seguimiento') { renderSeguimiento(); }
     // Actualizar hash si es necesario
     if (updateHash !== false) {
         var route = getRouteFromNav(navName);
@@ -1524,6 +1630,18 @@ async function init() {
     var closePreviewBtn = document.getElementById('close-preview');
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', function() { document.getElementById('import-preview').style.display = 'none'; });
 
+    // Seguimiento filters
+    document.getElementById('seg-filter-store') && document.getElementById('seg-filter-store').addEventListener('change', renderSeguimiento);
+    document.getElementById('seg-filter-status') && document.getElementById('seg-filter-status').addEventListener('change', renderSeguimiento);
+    document.getElementById('seg-filter-search') && document.getElementById('seg-filter-search').addEventListener('input', renderSeguimiento);
+    document.getElementById('refresh-seguimiento') && document.getElementById('refresh-seguimiento').addEventListener('click', async function() {
+        showToast('Cargando datos de seguimiento...', 'info');
+        await loadMasterData();
+        updateTiendaFilter();
+        renderSeguimiento();
+        showToast('Datos actualizados', 'success');
+    });
+
     // Escuchar cambios de ruta
     window.addEventListener('hashchange', handleRouteChange);
 
@@ -1531,6 +1649,10 @@ async function init() {
     await fetchSendsFromSheet();
     renderHistory();
     renderAnalytics();
+
+    // Cargar datos de seguimiento
+    await loadMasterData();
+    updateTiendaFilter();
 
     // Inicializar ruta segun la URL
     handleRouteChange();

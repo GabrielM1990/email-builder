@@ -31,6 +31,9 @@
                 <button class="nav-item" data-nav="clients" title="Clientes">
                     <i class="fas fa-users"></i><span>Clientes</span>
                 </button>
+                <button class="nav-item" data-nav="seguimiento" title="Seguimiento">
+                    <i class="fas fa-table"></i><span>Seguimiento</span>
+                </button>
             </div>
             <div class="nav-footer">
                 <button id="force-reload-data" class="nav-footer-btn" title="Forzar recarga">
@@ -164,6 +167,36 @@
                         <input type="text" id="search-clients-page" placeholder="Buscar clientes por nombre, email o empresa..." class="search-input-lg">
                     </div>
                     <div id="clients-page-grid" class="clients-page-grid"></div>
+                </div>
+            </div>
+
+            <!-- VISTA: Seguimiento -->
+            <div id="view-seguimiento" class="view-content">
+                <div class="view-header">
+                    <h2><i class="fas fa-table"></i> Seguimiento de Desarrollos por Tienda</h2>
+                    <div class="view-actions">
+                        <button id="refresh-seguimiento" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Recargar</button>
+                    </div>
+                </div>
+                <div class="view-body">
+                    <div class="seg-filters">
+                        <select id="seg-filter-store" class="seg-filter-select">
+                            <option value="">Todas las tiendas</option>
+                        </select>
+                        <select id="seg-filter-status" class="seg-filter-select">
+                            <option value="">Todos los estados</option>
+                            <option value="Implementado">Implementado</option>
+                            <option value="Propuesto">Propuesto</option>
+                            <option value="No aplica">No aplica</option>
+                            <option value="En curso">En curso</option>
+                            <option value="Proponer">Proponer</option>
+                        </select>
+                        <input type="text" id="seg-filter-search" placeholder="Buscar desarrollo..." class="search-input seg-filter-search">
+                        <span id="seg-count" class="seg-count"></span>
+                    </div>
+                    <div id="seg-table-wrapper" class="seg-table-wrapper">
+                        <div class="loading">Cargando datos de seguimiento...</div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1753,6 +1753,124 @@ body {
 }
 
 /* ============================================
+   SEGUIMIENTO - Matriz de productos por tienda
+   ============================================ */
+.seg-filters {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.seg-filter-select {
+    padding: 8px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    background: white;
+    min-width: 160px;
+}
+
+.seg-filter-select:focus {
+    border-color: #667eea;
+}
+
+.seg-filter-search {
+    flex: 1;
+    min-width: 200px;
+}
+
+.seg-count {
+    font-size: 12px;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+.seg-table-wrapper {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+}
+
+.seg-table-scroll {
+    overflow-x: auto;
+}
+
+.seg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.seg-table th {
+    background: #f8f9fa;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #e0e0e0;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.seg-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+.seg-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.seg-th-code {
+    min-width: 80px;
+}
+
+.seg-th-title {
+    min-width: 200px;
+}
+
+.seg-th-store {
+    min-width: 120px;
+    text-align: center;
+}
+
+.seg-td-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: #1a73e8;
+}
+
+.seg-td-title {
+    color: #2c3e50;
+}
+
+.seg-td-status {
+    text-align: center;
+}
+
+.seg-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.seg-badge i {
+    font-size: 10px;
+}
+
+/* ============================================
    EMPTY STATE ICON
    ============================================ */
 .empty-icon {
